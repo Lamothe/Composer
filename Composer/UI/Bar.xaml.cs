@@ -39,34 +39,29 @@ namespace Composer.UI
             if (UpdateUI)
             {
                 UpdateUI = false;
-                Canvas.Children.Clear();
 
                 var numberOfLines = ActualWidth / PixelInterval;
                 var bufferInterval = (int)(Model.Buffer.Length / numberOfLines);
-
-                int y = (int)ActualHeight / 2;
 
                 for (int i = 0; i < numberOfLines; i++)
                 {
                     if (i >= Lines.Count())
                     {
-                        Lines.Add(new Line());
+                        var newLine = new Line();
+                        Lines.Add(newLine);
+                        Canvas.Children.Add(newLine);
                     }
 
                     var line = Lines[i];
 
                     var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
-                    var newY = (int)(amplitude * ActualHeight / 2);
+                    var y = (int)(amplitude * ActualHeight / 2);
 
                     line.X1 = i * PixelInterval;
-                    line.Y1 = ActualHeight / 2 - newY;
+                    line.Y1 = ActualHeight / 2 - y;
                     line.X2 = i * PixelInterval;
-                    line.Y2 = ActualHeight / 2 + (newY == 0 ? 1 : newY);
+                    line.Y2 = ActualHeight / 2 + (y == 0 ? 1 : y);
                     line.Stroke = new SolidColorBrush(Colors.LightGray);
-
-                    y = newY;
-
-                    Canvas.Children.Add(line);
                 }
             }
         }

@@ -35,6 +35,11 @@ namespace Composer
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
 
+        private static Color TrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
+        private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x40, G = 0x40, B = 0x20 };
+        private static Brush TrackBrush = new SolidColorBrush(TrackColor);
+        private static Brush SelectedTrackBrush = new SolidColorBrush(SelectedTrackColor);
+
         private double Zoom = 0;
 
         public MainPage()
@@ -127,7 +132,14 @@ namespace Composer
             Grid.SetColumn(ui, 0);
             Tracks.Children.Add(ui);
 
-            model.BarAdded += (s, bar) => CallUI(() => ui.AddBar(bar));
+            model.BarAdded += (s, bar) => {
+                Updated = true;
+                CallUI(() =>
+                {
+                    var barUI = ui.AddBar(bar);
+                    barUI.Model.Update += (s1,e) => Updated = true;
+                });
+            };
 
             return ui;
         }
@@ -142,11 +154,6 @@ namespace Composer
             int row = 0;
             Tracks.Children.ToList().ForEach(track => Grid.SetRow(track as UI.Track, row++));
         }
-
-        private static Color TrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
-        private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x40, G = 0x40, B = 0x20 };
-        private static Brush TrackBrush = new SolidColorBrush(TrackColor);
-        private static Brush SelectedTrackBrush = new SolidColorBrush(SelectedTrackColor);
 
         private void SelectTrack(UI.Track ui)
         {

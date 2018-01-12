@@ -29,7 +29,6 @@ namespace Composer.Model
 
         public delegate void BarEventHandler(object sender, Model.Bar bar);
         public event BarEventHandler BarAdded;
-        public event BarEventHandler BarUpdated;
 
         public unsafe void Write()
         {
