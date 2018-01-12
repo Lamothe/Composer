@@ -23,15 +23,45 @@ namespace Composer.UI
         private List<Line> Lines { get; set; } = new List<Line>();
         private bool UpdateUI = false;
         private int PixelInterval = 1;
+        public bool IsSelected { get; set; }
+
+        private static Color BarColor =  new Color { A = 0xFF, R = 0x30, G = 0x30, B = 0x30 };
+        private static Color SelectedBarColor = new Color { A = 0xFF, R = 0x40, G = 0x40, B = 0x20 };
+        private static Brush BarBrush = new SolidColorBrush(BarColor);
+        private static Brush SelectedBarBrush = new SolidColorBrush(SelectedBarColor);
 
         public Bar()
         {
             this.InitializeComponent();
+            Canvas.Background = BarBrush;
         }
 
         public void QueueUpdate()
         {
             UpdateUI = true;
+        }
+
+        public void Select(bool isSelected)
+        {
+            IsSelected = isSelected;
+            Canvas.Background = isSelected ? SelectedBarBrush : BarBrush;
+        }
+
+        public UI.Track Track
+        {
+            get
+            {
+                var element = Parent;
+                while (!(element is UI.Track))
+                {
+                    if (element == null)
+                    {
+                        throw new Exception("Parent track not found");
+                    }
+                    element = (element as FrameworkElement).Parent;
+                }
+                return element as UI.Track;
+            }
         }
 
         public void Update()

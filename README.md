@@ -9,27 +9,27 @@ Individual bars can be copied and pasted and then grouped and looped over to cre
 * Delete track
 
 ## TODO
-These are the things that need to be done before the application is "feature complete": (not ordered)
+These are the things that need to be done before the application is "feature complete":
 * Bug: Multitrack (more than 3) playback sounds choppy like the computer isn't keeping up
-* Hightlight selected bar/track
-* Select BPM, currently fixed at 120
-* Select beats per bar, currently set at 4
 * Save
-* Delete bar
-* Drag/drop bars
-* Metronome
-* Track playback volume
-* Minimal effects - Eq, reverb, delay
 * Keyboard shortcuts
 * Mute track
 * Solo playback
+* Playback marker
+* Delete bar
+* Cut/copy/paste bar
+* Loop bars
+* Select BPM, currently fixed at 120
+* Select beats per bar, currently set at 4
+* Metronome
+* Track playback volume
+* Minimal effects - Eq, reverb, delay
 * Touch based operation
 * Pedal controls
-* Playback marker
 
 ## Limitations
 Here are a list features that I'm not planning to implement:
 * Guitar effects (instead, use something like a Boss GT-1)
 * Compositions with changing time signatures.
 
-Pull requests are welcomed and 
+Pull requests are welcomed.

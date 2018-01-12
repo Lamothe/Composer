@@ -25,6 +25,11 @@ namespace Composer.UI
 
         public event EventHandler DeleteTrack;
 
+        private static Color TrackColor = new Color { A = 0xFF, R = 0x10, G = 0x10, B = 0x10 };
+        private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
+        private static Brush TrackBrush = new SolidColorBrush(TrackColor);
+        private static Brush SelectedTrackBrush = new SolidColorBrush(SelectedTrackColor);
+
         public Track()
         {
             this.InitializeComponent();
@@ -62,6 +67,20 @@ namespace Composer.UI
             Bars.Children.Add(ui);
 
             return ui;
+        }
+
+        public void Select(bool isSelected)
+        {
+            TrackGrid.Background = isSelected ? SelectedTrackBrush : TrackBrush;
+            if (!isSelected)
+            {
+                Bars.Children.ToList().ForEach(x => (x as UI.Bar).Select(false));
+            }
+        }
+
+        public void SelectBar(UI.Bar ui)
+        {
+            Bars.Children.ToList().ForEach(x => (x as UI.Bar).Select(x == ui));
         }
     }
 }

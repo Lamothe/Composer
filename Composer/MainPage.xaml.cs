@@ -24,7 +24,10 @@ namespace Composer
 {
     public static class DecimalExtension
     {
-        public static string ToTimeString(this decimal d) { return d.ToString("0.00"); }
+        public static string ToTimeString(this decimal d)
+        {
+            return d.ToString("0.00");
+        }
     }
 
     public sealed partial class MainPage : Page
@@ -34,11 +37,6 @@ namespace Composer
         private Model.Metronome Metronome { get; set; }
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
-
-        private static Color TrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
-        private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x40, G = 0x40, B = 0x20 };
-        private static Brush TrackBrush = new SolidColorBrush(TrackColor);
-        private static Brush SelectedTrackBrush = new SolidColorBrush(SelectedTrackColor);
 
         private double Zoom = 0;
 
@@ -59,11 +57,13 @@ namespace Composer
             };
 
             var timer = new System.Timers.Timer(100);
-            timer.Elapsed += (s, e) => {
+            timer.Elapsed += (s, e) =>
+            {
                 if (Updated)
                 {
                     Updated = false;
-                    CallUI(() => {
+                    CallUI(() =>
+                    {
                         Tracks.Children.ToList().ForEach(x => (x as UI.Track).Update());
                     });
                 }
@@ -132,24 +132,31 @@ namespace Composer
             Grid.SetColumn(ui, 0);
             Tracks.Children.Add(ui);
 
-            model.BarAdded += (s, bar) => {
+            model.BarAdded += (s, bar) =>
+            {
                 Updated = true;
+                bar.Update += (s2, e) => Updated = true;
                 CallUI(() =>
                 {
                     var barUI = ui.AddBar(bar);
-                    barUI.Model.Update += (s1,e) => Updated = true;
+                    barUI.PointerPressed += (s1, e) =>
+                    {
+                        SelectTrack(barUI.Track);
+                        barUI.Track.SelectBar(barUI);
+                    };
                 });
             };
 
             return ui;
         }
 
-        private async void CallUI(DispatchedHandler x) => 
+        private async void CallUI(DispatchedHandler x) =>
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, x);
 
         private void DeleteTrack(UI.Track ui)
         {
             ui.Model.Stop();
+            Song.Tracks.Remove(ui.Model);
             Tracks.Children.Remove(ui);
             int row = 0;
             Tracks.Children.ToList().ForEach(track => Grid.SetRow(track as UI.Track, row++));
@@ -157,10 +164,7 @@ namespace Composer
 
         private void SelectTrack(UI.Track ui)
         {
-            Tracks.Children.ToList().ForEach(x => {
-                (x as UI.Track).IsSelected = x == ui;
-                ui.Background = x == ui ? SelectedTrackBrush : TrackBrush;
-            });
+            Tracks.Children.ToList().ForEach(x => (x as UI.Track).Select(x == ui));
         }
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
