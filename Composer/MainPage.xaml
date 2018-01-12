@@ -1,0 +1,27 @@
+﻿<Page
+    x:Class="Composer.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Composer"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" Loaded="Page_Loaded">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="100" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="50" />
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" Grid.Row="0">
+            <Button Name="PlayButton" Content="Play/Pause" Click="PlayButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
+            <Button Name="RecordButton" Content="Record" Click="RecordButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
+            <Button Name="StopButton" Content="Stop" Click="StopButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
+            <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
+            <TextBlock Name="Info" />
+        </StackPanel>
+        <Grid Name="Tracks" Grid.Row="1"/>
+        <TextBlock Name="Status" Grid.Row="2">
+        </TextBlock>
+    </Grid>
+</Page>

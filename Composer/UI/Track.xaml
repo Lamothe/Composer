@@ -1,0 +1,23 @@
+﻿<UserControl
+    x:Class="Composer.UI.Track"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Composer.UI"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DesignHeight="100"
+    d:DesignWidth="600">
+
+    <Grid Margin="2,2,2,2">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="100" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Name ="Info" Grid.Column="0" Text="Info" TextWrapping="Wrap" />
+        <Grid Name="Bars" Grid.Column="1">
+        </Grid>
+        <Button Name="DeleteButton" Grid.Column="2" Content="X" VerticalAlignment="Stretch" HorizontalAlignment="Right" Width="100"></Button>
+    </Grid>
+</UserControl>
