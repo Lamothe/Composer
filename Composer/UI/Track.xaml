@@ -15,7 +15,14 @@
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="100" />
         </Grid.ColumnDefinitions>
-        <TextBlock Name ="Info" Grid.Column="0" Text="Info" TextWrapping="Wrap" />
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Name="Info" Text="Info" TextWrapping="Wrap" Grid.Row="0" />
+            <ToggleButton Name="MuteButton" Content="Mute" Grid.Row="1" HorizontalAlignment="Stretch" />
+        </Grid>
         <ScrollViewer Name="Scroll" Grid.Column="1" VerticalScrollMode="Disabled" HorizontalScrollBarVisibility="Hidden">
             <Grid Name="Bars">
             </Grid>

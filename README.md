@@ -10,8 +10,6 @@ Individual bars can be copied and pasted and then grouped and looped over to cre
 
 ## TODO
 These are the things that need to be done before the application is "feature complete":
-* Mute track
-* Solo playback
 * Playback marker
 * Delete bar
 * Cut/copy/paste bar

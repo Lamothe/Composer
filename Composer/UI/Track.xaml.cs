@@ -39,6 +39,8 @@ namespace Composer.UI
 
             DeleteButton.Click += (s, e) => DeleteTrack?.Invoke(this, EventArgs.Empty);
             Scroll.ViewChanged += (s, e) => ScrollViewChanged?.Invoke(this, Scroll.HorizontalOffset);
+            MuteButton.Checked += (s, e) => Model.IsMuted = true;
+            MuteButton.Unchecked += (s, e) => Model.IsMuted = false;
         }
 
         private Brush GetBackground()

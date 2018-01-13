@@ -25,6 +25,7 @@ namespace Composer.Model
         public IEnumerator<Bar> BarEnumerator { get; set; }
         private Bar WriteBar { get; set; }
         public uint SamplesPerBar { get; set; }
+        public bool IsMuted { get; set; }
 
         public event EventHandler StatusChanged;
 
@@ -129,7 +130,14 @@ namespace Composer.Model
                                 var dataInFloat = (float*)dataInBytes;
                                 for (int i = 0; i < bufferSize; i++)
                                 {
-                                    dataInFloat[i] = readBar.Buffer[i + (uint)Position];
+                                    if (IsMuted)
+                                    {
+                                        dataInFloat[i] = 0;
+                                    }
+                                    else
+                                    {
+                                        dataInFloat[i] = readBar.Buffer[i + (uint)Position];
+                                    }
                                 }
                             }
                         }
