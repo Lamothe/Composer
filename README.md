@@ -1,6 +1,6 @@
 # Composer
 A UWP based multi-track music recorder for Windows written in C#.
-The UI layout is similar to Audacity however the workflow is designed for creating and looping multi-instrument music with your old Windows PC/laptop.
+The UI layout is similar to Audacity however the workflow is designed for creating and looping multi-instrument music with your older Windows PC/laptop.
 Individual bars can be copied and pasted and then grouped and looped over to create backing tracks.
 
 ## Features (Current)

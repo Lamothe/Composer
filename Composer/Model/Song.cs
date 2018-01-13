@@ -13,6 +13,8 @@ namespace Composer.Model
         public List<Track> Tracks { get; set; } = new List<Track>();
         public Status Status { get; set; } = Status.Stopped;
 
+        public event EventHandler StatusChanged;
+
         public void AddTrack(Model.Track track)
         {
             Tracks.Add(track);
@@ -28,11 +30,16 @@ namespace Composer.Model
             };
         }
 
+        public void Record()
+        {
+            ChangeStatus(Status.Recording);
+        }
+
         public void Play()
         {
             if (Status == Status.Stopped)
             {
-                Status = Status.Playing;
+                ChangeStatus(Status.Playing);
                 Tracks.ForEach(x => x.Play());
             }
         }
@@ -41,9 +48,15 @@ namespace Composer.Model
         {
             if (Status != Status.Stopped)
             {
-                Status = Status.Stopped;
+                ChangeStatus(Status.Stopped);
                 Tracks.ForEach(x => x.Stop());
             }
+        }
+
+        public void ChangeStatus(Status status)
+        {
+            Status = status;
+            StatusChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

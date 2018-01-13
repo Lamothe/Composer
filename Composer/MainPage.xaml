@@ -7,21 +7,22 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d" Loaded="Page_Loaded">
 
-    <Grid Name="Root"  Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="100" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="50" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" Grid.Row="0">
             <Button Name="PlayButton" Content="Play/Pause" Click="PlayButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="RecordButton" Content="Record" Click="RecordButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="StopButton" Content="Stop" Click="StopButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
-            <TextBlock Name="Info" />
         </StackPanel>
         <Grid Name="Tracks" Grid.Row="1"/>
-        <TextBlock Name="Status" Grid.Row="2">
-        </TextBlock>
+        <Grid Grid.Row="2" BorderBrush="#FF202020" BorderThickness="2" Background="#FF101010">
+            <TextBlock Name="Status">
+            </TextBlock>
+        </Grid>
     </Grid>
 </Page>

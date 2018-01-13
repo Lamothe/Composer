@@ -58,15 +58,17 @@ namespace Composer
 
             Song = new Song();
 
-            Tracks.PointerWheelChanged += (s, e) =>
-            {
-                var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
+            Song.StatusChanged += (s, e) => { CallUI(() => Status.Text = Song.Status.ToString()); };
 
-                if ((e.KeyModifiers & Windows.System.VirtualKeyModifiers.Control) != 0)
+            Tracks.PointerWheelChanged += (s, e) =>
                 {
-                    Zoom += delta * 0.01;
-                }
-            };
+                    var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
+
+                    if ((e.KeyModifiers & Windows.System.VirtualKeyModifiers.Control) != 0)
+                    {
+                        Zoom += delta * 0.01;
+                    }
+                };
 
             var timer = new System.Timers.Timer(100);
             timer.Elapsed += (s, e) =>
@@ -90,13 +92,20 @@ namespace Composer
 
         private async void Load()
         {
-            Audio = await Model.Audio.Create();
-            Metronome = new Model.Metronome(Audio);
+            try
+            {
+                Audio = await Model.Audio.Create();
+                Metronome = new Model.Metronome(Audio);
 
-            PlayButton.IsEnabled = true;
-            RecordButton.IsEnabled = true;
-            StopButton.IsEnabled = true;
-            MetronomeButton.IsEnabled = true;
+                PlayButton.IsEnabled = true;
+                RecordButton.IsEnabled = true;
+                StopButton.IsEnabled = true;
+                MetronomeButton.IsEnabled = true;
+            }
+            catch (Exception)
+            {
+                // Ignore access is denied
+            }
         }
 
         private string GenerateTrackName()
@@ -216,9 +225,9 @@ namespace Composer
         {
             if (Song.Status == Model.Status.Stopped)
             {
-                Song.Status = Model.Status.Recording;
                 var track = AddTrack();
                 track.Model.Record();
+                Song.Record();
                 SelectTrack(track);
                 Audio.Start();
             }
