@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Windows.Media;
 using Windows.Media.Audio;
+using Windows.Media.MediaProperties;
 
 namespace Composer.Model
 {
@@ -25,10 +26,26 @@ namespace Composer.Model
         private Bar WriteBar { get; set; }
         public uint SamplesPerBar { get; set; }
 
-        public event EventHandler TrackInformationChanged;
+        public event EventHandler StatusChanged;
 
         public delegate void BarEventHandler(object sender, Model.Bar bar);
         public event BarEventHandler BarAdded;
+
+        public Track(string name, Audio audio)
+        {
+            var encodingProperties = audio.Graph.EncodingProperties;
+            encodingProperties.ChannelCount = 1;
+
+            Name = name;
+            FrameInputNode = audio.Graph.CreateFrameInputNode(encodingProperties);
+            FrameOutputNode = audio.Graph.CreateFrameOutputNode(encodingProperties);
+
+            audio.DeviceInputNode.AddOutgoingConnection(FrameOutputNode);
+            FrameInputNode.AddOutgoingConnection(audio.DeviceOutputNode);
+
+            audio.Graph.QuantumStarted += (g, e) => Write();
+            FrameInputNode.QuantumStarted += (g, e) => Read(e.RequiredSamples);
+        }
 
         public unsafe void Write()
         {
@@ -130,8 +147,7 @@ namespace Composer.Model
             if (Status == Status.Stopped)
             {
                 FrameOutputNode.Start();
-                Status = Status.Recording;
-                TrackInformationChanged?.Invoke(this, EventArgs.Empty);
+                ChangeStatus(Status.Recording);
             }
         }
 
@@ -144,8 +160,7 @@ namespace Composer.Model
                 if (BarEnumerator.MoveNext())
                 {
                     FrameInputNode.Start();
-                    Status = Status.Playing;
-                    TrackInformationChanged?.Invoke(this, EventArgs.Empty);
+                    ChangeStatus(Status.Playing);
                 }
             }
         }
@@ -154,8 +169,13 @@ namespace Composer.Model
         {
             FrameInputNode.Stop();
             FrameOutputNode.Stop();
-            Status = Status.Stopped;
-            TrackInformationChanged?.Invoke(this, EventArgs.Empty);
+            ChangeStatus(Status.Stopped);
+        }
+
+        private void ChangeStatus(Status status)
+        {
+            Status = status;
+            StatusChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

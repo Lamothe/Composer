@@ -10,18 +10,18 @@ Individual bars can be copied and pasted and then grouped and looped over to cre
 
 ## TODO
 These are the things that need to be done before the application is "feature complete":
-* Bug: Multitrack (more than 3) playback sounds choppy like the computer isn't keeping up
-* Save
-* Keyboard shortcuts
 * Mute track
 * Solo playback
 * Playback marker
 * Delete bar
 * Cut/copy/paste bar
+* Scroll
 * Loop bars
+* Save
 * Select BPM, currently fixed at 120
 * Select beats per bar, currently set at 4
 * Metronome
+### Low priority
 * Track playback volume
 * Minimal effects - Eq, reverb, delay
 * Touch based operation

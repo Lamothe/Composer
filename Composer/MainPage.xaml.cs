@@ -44,6 +44,18 @@ namespace Composer
         {
             this.InitializeComponent();
 
+            Root.KeyUp += (s, e) =>
+            {
+                if (e.Key == Windows.System.VirtualKey.R)
+                {
+                    ToggleRecord();
+                }
+                else if (e.Key == Windows.System.VirtualKey.Space)
+                {
+                    TogglePlay();
+                }
+            };
+
             Song = new Song();
 
             Tracks.PointerWheelChanged += (s, e) =>
@@ -101,28 +113,12 @@ namespace Composer
 
         private UI.Track AddTrack()
         {
-            var encodingProperties = Audio.Graph.EncodingProperties;
-            encodingProperties.ChannelCount = 1;
-
-            var model = new Model.Track()
-            {
-                Name = GenerateTrackName(),
-                FrameInputNode = Audio.Graph.CreateFrameInputNode(encodingProperties),
-                FrameOutputNode = Audio.Graph.CreateFrameOutputNode(encodingProperties)
-            };
-
-            model.Stop();
-
-            Audio.DeviceInputNode.AddOutgoingConnection(model.FrameOutputNode);
-            model.FrameInputNode.AddOutgoingConnection(Audio.DeviceOutputNode);
-
-            Audio.Graph.QuantumStarted += (g, e) => model.Write();
-            model.FrameInputNode.QuantumStarted += (g, e) => model.Read(e.RequiredSamples);
             var samplesPerMinute = 60 * Audio.SamplesPerSecond;
-            model.SamplesPerBar = (uint)(samplesPerMinute * Song.BeatsPerBar) / Song.BeatsPerMinute;
 
-            Song.Tracks.Add(model);
-            model.TrackInformationChanged += (s, e) => Updated = true;
+            var model = new Track(GenerateTrackName(), Audio);
+            model.SamplesPerBar = (uint)(samplesPerMinute * Song.BeatsPerBar) / Song.BeatsPerMinute;
+            Song.AddTrack(model);
+            model.StatusChanged += (s, e) => Updated = true;
 
             var ui = new UI.Track { Model = model };
             ui.PointerPressed += (s, e) => SelectTrack(ui);
@@ -169,31 +165,17 @@ namespace Composer
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
         {
-            Song.Tracks.ForEach(x => x.Stop());
-
-            var track = AddTrack();
-            track.Model.Record();
-            SelectTrack(track);
-
-            Audio.Start();
+            Record();
         }
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            Song.Tracks.ForEach(x =>
-            {
-                x.Play();
-                Audio.Start();
-            });
+            Play();
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            Song.Tracks.ForEach(x =>
-            {
-                x.Stop();
-                Audio.Stop();
-            });
+            Stop();
         }
 
         private void MetronomeButton_Checked(object sender, RoutedEventArgs e)
@@ -204,6 +186,54 @@ namespace Composer
         private void MetronomeButton_Unchecked(object sender, RoutedEventArgs e)
         {
             Metronome.Stop();
+        }
+
+        private void ToggleRecord()
+        {
+            if (Song.Status == Model.Status.Stopped)
+            {
+                Record();
+            }
+            else
+            {
+                Stop();
+            }
+        }
+
+        private void TogglePlay()
+        {
+            if (Song.Status == Model.Status.Stopped)
+            {
+                Play();
+            }
+            else
+            {
+                Stop();
+            }
+        }
+
+        private void Record()
+        {
+            if (Song.Status == Model.Status.Stopped)
+            {
+                Song.Status = Model.Status.Recording;
+                var track = AddTrack();
+                track.Model.Record();
+                SelectTrack(track);
+                Audio.Start();
+            }
+        }
+
+        private void Play()
+        {
+            Song.Play();
+            Audio.Start();
+        }
+
+        private void Stop()
+        {
+            Song.Stop();
+            Audio.Stop();
         }
     }
 }

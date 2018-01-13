@@ -27,14 +27,31 @@ namespace Composer.UI
 
         private static Color TrackColor = new Color { A = 0xFF, R = 0x10, G = 0x10, B = 0x10 };
         private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
+        private static Color RecordingTrackColor = new Color { A = 0xFF, R = 0x40, G = 0x20, B = 0x20 };
         private static Brush TrackBrush = new SolidColorBrush(TrackColor);
         private static Brush SelectedTrackBrush = new SolidColorBrush(SelectedTrackColor);
+        private static Brush RecordingTrackBrush = new SolidColorBrush(RecordingTrackColor);
 
         public Track()
         {
             this.InitializeComponent();
 
             DeleteButton.Click += (s, e) => DeleteTrack?.Invoke(this, EventArgs.Empty);
+        }
+
+        private Brush GetBackground()
+        {
+            if (Model.Status == Composer.Model.Status.Recording)
+            {
+                return RecordingTrackBrush;
+            }
+
+            if (IsSelected)
+            {
+                return SelectedTrackBrush;
+            }
+
+            return TrackBrush;
         }
 
         public void Update()
@@ -44,6 +61,7 @@ namespace Composer.UI
                 (ui as UI.Bar).Update();
             }
 
+            TrackGrid.Background = GetBackground();
             Info.Text = $"{Model.Name}\r\n{Model.Status}";
         }
 
@@ -71,7 +89,7 @@ namespace Composer.UI
 
         public void Select(bool isSelected)
         {
-            TrackGrid.Background = isSelected ? SelectedTrackBrush : TrackBrush;
+            IsSelected = isSelected;
             if (!isSelected)
             {
                 Bars.Children.ToList().ForEach(x => (x as UI.Bar).Select(false));
