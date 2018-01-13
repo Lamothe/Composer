@@ -16,8 +16,10 @@
             <ColumnDefinition Width="100" />
         </Grid.ColumnDefinitions>
         <TextBlock Name ="Info" Grid.Column="0" Text="Info" TextWrapping="Wrap" />
-        <Grid Name="Bars" Grid.Column="1">
-        </Grid>
+        <ScrollViewer Name="Scroll" Grid.Column="1" VerticalScrollMode="Disabled" HorizontalScrollBarVisibility="Hidden">
+            <Grid Name="Bars">
+            </Grid>
+        </ScrollViewer>
         <Button Name="DeleteButton" Grid.Column="2" Content="X" VerticalAlignment="Stretch" HorizontalAlignment="Right" Width="100"></Button>
     </Grid>
 </UserControl>

@@ -22,14 +22,6 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Composer
 {
-    public static class DecimalExtension
-    {
-        public static string ToTimeString(this decimal d)
-        {
-            return d.ToString("0.00");
-        }
-    }
-
     public sealed partial class MainPage : Page
     {
         private Model.Song Song { get; set; }
@@ -37,6 +29,7 @@ namespace Composer
         private Model.Metronome Metronome { get; set; }
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
+        private bool ScrollUpdating = false;
 
         private double Zoom = 0;
 
@@ -57,7 +50,7 @@ namespace Composer
             };
 
             Song = new Song();
-
+            
             Song.StatusChanged += (s, e) => { CallUI(() => Status.Text = Song.Status.ToString()); };
 
             Tracks.PointerWheelChanged += (s, e) =>
@@ -130,8 +123,19 @@ namespace Composer
             model.StatusChanged += (s, e) => Updated = true;
 
             var ui = new UI.Track { Model = model };
+
             ui.PointerPressed += (s, e) => SelectTrack(ui);
             ui.DeleteTrack += (s, e) => DeleteTrack(ui);
+            ui.ScrollViewChanged += (s, offset) =>
+            {
+                if (!ScrollUpdating)
+                {
+                    ScrollUpdating = true;
+                    Tracks.ForEach<UI.Track>(x => x.UpdateScroll(offset));
+                    ScrollUpdating = false;
+                }
+            };
+
             Tracks.RowDefinitions.Add(new RowDefinition { Height = new GridLength(100) });
             Grid.SetRow(ui, Tracks.Children.Count());
             Grid.SetColumn(ui, 0);
@@ -164,12 +168,12 @@ namespace Composer
             Song.Tracks.Remove(ui.Model);
             Tracks.Children.Remove(ui);
             int row = 0;
-            Tracks.Children.ToList().ForEach(track => Grid.SetRow(track as UI.Track, row++));
+            Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
         }
 
         private void SelectTrack(UI.Track ui)
         {
-            Tracks.Children.ToList().ForEach(x => (x as UI.Track).Select(x == ui));
+            Tracks.ForEach<UI.Track>(t => t.Select(t == ui));
         }
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)

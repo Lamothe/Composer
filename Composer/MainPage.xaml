@@ -19,10 +19,11 @@
             <Button Name="StopButton" Content="Stop" Click="StopButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
         </StackPanel>
-        <Grid Name="Tracks" Grid.Row="1"/>
-        <Grid Grid.Row="2" BorderBrush="#FF202020" BorderThickness="2" Background="#FF101010">
-            <TextBlock Name="Status">
-            </TextBlock>
+        <ScrollViewer Grid.Row="1">
+            <Grid Name="Tracks"/>
+        </ScrollViewer>
+        <Grid Grid.Row="2" BorderBrush="#FF404040" BorderThickness="1" Background="#FF202020">
+            <TextBlock Name="Status" />
         </Grid>
     </Grid>
 </Page>

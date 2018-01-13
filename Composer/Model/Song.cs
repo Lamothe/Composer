@@ -18,13 +18,12 @@ namespace Composer.Model
         public void AddTrack(Model.Track track)
         {
             Tracks.Add(track);
-            track.StatusChanged += (s, e) =>
-            {
+            track.StatusChanged += (s, e) => {
                 if (track.Status == Status.Stopped)
                 {
                     if (!Tracks.Any(t => t.Status != Status.Stopped))
                     {
-                        Stop();
+                        ChangeStatus(Status.Stopped);
                     }
                 }
             };
@@ -39,8 +38,8 @@ namespace Composer.Model
         {
             if (Status == Status.Stopped)
             {
-                ChangeStatus(Status.Playing);
                 Tracks.ForEach(x => x.Play());
+                ChangeStatus(Status.Playing);
             }
         }
 
@@ -48,15 +47,18 @@ namespace Composer.Model
         {
             if (Status != Status.Stopped)
             {
-                ChangeStatus(Status.Stopped);
                 Tracks.ForEach(x => x.Stop());
+                ChangeStatus(Status.Stopped);
             }
         }
 
         public void ChangeStatus(Status status)
         {
-            Status = status;
-            StatusChanged?.Invoke(this, EventArgs.Empty);
+            if (status != Status)
+            {
+                Status = status;
+                StatusChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 }

@@ -15,7 +15,6 @@ These are the things that need to be done before the application is "feature com
 * Playback marker
 * Delete bar
 * Cut/copy/paste bar
-* Scroll
 * Loop bars
 * Save
 * Select BPM, currently fixed at 120

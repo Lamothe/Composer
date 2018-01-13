@@ -24,6 +24,7 @@ namespace Composer.UI
         public uint BarWidth { get; set; } = 200;
 
         public event EventHandler DeleteTrack;
+        public event EventHandler<double> ScrollViewChanged;
 
         private static Color TrackColor = new Color { A = 0xFF, R = 0x10, G = 0x10, B = 0x10 };
         private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
@@ -37,6 +38,7 @@ namespace Composer.UI
             this.InitializeComponent();
 
             DeleteButton.Click += (s, e) => DeleteTrack?.Invoke(this, EventArgs.Empty);
+            Scroll.ViewChanged += (s, e) => ScrollViewChanged?.Invoke(this, Scroll.HorizontalOffset);
         }
 
         private Brush GetBackground()
@@ -99,6 +101,11 @@ namespace Composer.UI
         public void SelectBar(UI.Bar ui)
         {
             Bars.Children.ToList().ForEach(x => (x as UI.Bar).Select(x == ui));
+        }
+
+        public void UpdateScroll(double horizontalOffset)
+        {
+            Scroll.ChangeView(horizontalOffset, 0, 1);
         }
     }
 }
