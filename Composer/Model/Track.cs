@@ -41,12 +41,12 @@ namespace Composer.Model
             FrameInputNode.AddOutgoingConnection(audio.DeviceOutputNode);
         }
 
-        public unsafe int Write(int position)
+        public unsafe void Write(int position)
         {
-            var numberOfSamples = 0;
-
             if (Status == Status.Recording)
             {
+                var totalBufferLength = Bars.Count() * SamplesPerBar;
+
                 using (var frame = FrameOutputNode.GetFrame())
                 {
                     using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
@@ -54,20 +54,20 @@ namespace Composer.Model
                         using (var reference = buffer.CreateReference())
                         {
                             ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* unsafeBuffer, out uint numberOfBytes);
-                            numberOfSamples = (int)numberOfBytes / ElementSize;
+                            var numberOfSamples = (int)numberOfBytes / ElementSize;
 
-                            Bar bar = null;
-                            var barIndex = position / SamplesPerBar;
-                            var totalBufferLength = Bars.Count() * SamplesPerBar;
-                            if (barIndex >= Bars.Count() || (position + numberOfSamples) >= totalBufferLength)
+                            if (position + numberOfSamples >= + totalBufferLength)
                             {
-                                bar = new Bar { Buffer = new float[SamplesPerBar] };
-                                Bars.Add(bar);
-                                BarAdded?.Invoke(this, bar);
+                                Stop();
+                                return;
                             }
-                            else
+
+                            var barIndex = position / SamplesPerBar;
+                            var bar = Bars[barIndex];
+
+                            if (bar.Buffer == null)
                             {
-                                bar = Bars[barIndex];
+                                bar.Buffer = new float[SamplesPerBar];
                             }
 
                             var offset = position % SamplesPerBar;
@@ -82,8 +82,6 @@ namespace Composer.Model
                     }
                 }
             }
-
-            return numberOfSamples;
         }
 
         public unsafe void Read(int position, int numberOfSamples)
@@ -163,6 +161,13 @@ namespace Composer.Model
         {
             Status = status;
             StatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void AddBar()
+        {
+            var model = new Model.Bar();
+            Bars.Add(model);
+            BarAdded?.Invoke(this, model);
         }
     }
 }

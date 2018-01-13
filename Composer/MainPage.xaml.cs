@@ -63,8 +63,14 @@ namespace Composer
             var paste = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             paste.Invoked += async (s, e) =>
             {
-                if (SelectedBar != null && SelectedBar.Model != null && SelectedBar.Model.Buffer != null)
+                if (SelectedBar != null && SelectedBar.Model != null)
                 {
+                    if (SelectedBar.Model.Buffer == null)
+                    {
+                        var samplesPerBar = SelectedBar.Track.Model.SamplesPerBar;
+                        SelectedBar.Model.Buffer = new float[samplesPerBar];
+                    }
+
                     var content = Clipboard.GetContent();
                     if (content.AvailableFormats.Contains("PCM"))
                     {
@@ -110,13 +116,16 @@ namespace Composer
 
         private void UpdateStatus()
         {
-            if (Song.Status == Model.Status.Stopped)
-            {
-                Stop();
-            }
-
             var seconds = Song.Position / (decimal)Audio.SamplesPerSecond;
-            CallUI(() => Status.Text = $"{Song.Status.ToString()}: {seconds.ToTimeString()} ({Song.Position})");
+            CallUI(() =>
+            {
+                if (Song.Status == Model.Status.Stopped)
+                {
+                    Stop();
+                }
+
+                Status.Text = $"{Song.Status.ToString()}: {seconds.ToTimeString()} s";
+            });
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
@@ -154,7 +163,7 @@ namespace Composer
             }
         }
 
-        private object quantumProcessedLocker = new object();
+        private object QuantumProcessedLocker = new object();
         private UI.Track AddTrack()
         {
             var samplesPerMinute = 60 * Audio.SamplesPerSecond;
@@ -173,7 +182,7 @@ namespace Composer
             {
                 var unprocessedQuantums = (int)g.CompletedQuantumCount - QuantumsProcessed;
 
-                lock (quantumProcessedLocker)
+                lock (QuantumProcessedLocker)
                 {
                     if (unprocessedQuantums >= 0)
                     {
@@ -187,7 +196,6 @@ namespace Composer
             Song.AddTrack(model);
 
             var ui = new UI.Track { Model = model };
-
             ui.PointerPressed += (s, e) => SelectTrack(ui);
 
             ui.DeleteTrack += (s, e) =>
@@ -217,7 +225,7 @@ namespace Composer
             model.BarAdded += (s, bar) =>
             {
                 Updated = true;
-                bar.Update += (s2, e) => Updated = true;
+                bar.Update += (s1, e) => Updated = true;
                 CallUI(() =>
                 {
                     var barUI = ui.AddBar(bar);
@@ -242,6 +250,11 @@ namespace Composer
                     };
                 });
             };
+
+            for (int count = 0; count < 20; count++)
+            {
+                model.AddBar();
+            }
 
             return ui;
         }
