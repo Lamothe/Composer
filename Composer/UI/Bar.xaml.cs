@@ -21,9 +21,12 @@ namespace Composer.UI
     {
         public Model.Bar Model { get; set; }
         private List<Line> Lines { get; set; } = new List<Line>();
-        private bool UpdateUI = false;
+        private bool UpdateUI { get; set; } = false;
         private int PixelInterval = 1;
         public bool IsSelected { get; set; }
+
+        public event EventHandler Deleted;
+        public event EventHandler Selected;
 
         private static Color BarColor =  new Color { A = 0xFF, R = 0x30, G = 0x30, B = 0x30 };
         private static Color SelectedBarColor = new Color { A = 0xFF, R = 0x40, G = 0x40, B = 0x20 };
@@ -34,6 +37,14 @@ namespace Composer.UI
         {
             this.InitializeComponent();
             Canvas.Background = BarBrush;
+            Canvas.RightTapped += (s, e) => {
+                var deleteItem = new MenuFlyoutItem { Text = "Delete" };
+                deleteItem.Click += (s1, e1) => Deleted(this, EventArgs.Empty);
+
+                var menu = new MenuFlyout();
+                menu.Items.Add(deleteItem);
+                menu.ShowAt(Canvas, e.GetPosition(Canvas));
+            };
         }
 
         public void QueueUpdate()
@@ -43,8 +54,12 @@ namespace Composer.UI
 
         public void Select(bool isSelected)
         {
-            IsSelected = isSelected;
-            Canvas.Background = isSelected ? SelectedBarBrush : BarBrush;
+            if (isSelected != IsSelected)
+            {
+                IsSelected = isSelected;
+                Canvas.Background = isSelected ? SelectedBarBrush : BarBrush;
+                Selected?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         public UI.Track Track
@@ -71,29 +86,42 @@ namespace Composer.UI
                 UpdateUI = false;
 
                 var numberOfLines = ActualWidth / PixelInterval;
-                var bufferInterval = (int)(Model.Buffer.Length / numberOfLines);
 
-                for (int i = 0; i < numberOfLines; i++)
+                if (Model.Buffer == null)
                 {
-                    if (i >= Lines.Count())
+                    Canvas.Children.Clear();
+                }
+                else
+                {
+                    var bufferInterval = (int)(Model.Buffer.Length / numberOfLines);
+
+                    for (int i = 0; i < numberOfLines; i++)
                     {
-                        var newLine = new Line();
-                        Lines.Add(newLine);
-                        Canvas.Children.Add(newLine);
+                        if (i >= Lines.Count())
+                        {
+                            var newLine = new Line();
+                            Lines.Add(newLine);
+                            Canvas.Children.Add(newLine);
+                        }
+
+                        var line = Lines[i];
+
+                        var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
+                        var y = (int)(amplitude * ActualHeight / 2);
+
+                        line.X1 = i * PixelInterval;
+                        line.Y1 = ActualHeight / 2 - y;
+                        line.X2 = i * PixelInterval;
+                        line.Y2 = ActualHeight / 2 + (y == 0 ? 1 : y);
+                        line.Stroke = new SolidColorBrush(Colors.LightGray);
                     }
-
-                    var line = Lines[i];
-
-                    var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
-                    var y = (int)(amplitude * ActualHeight / 2);
-
-                    line.X1 = i * PixelInterval;
-                    line.Y1 = ActualHeight / 2 - y;
-                    line.X2 = i * PixelInterval;
-                    line.Y2 = ActualHeight / 2 + (y == 0 ? 1 : y);
-                    line.Stroke = new SolidColorBrush(Colors.LightGray);
                 }
             }
+        }
+
+        public void Delete()
+        {
+            Deleted?.Invoke(this, EventArgs.Empty);
         }
     }
 }

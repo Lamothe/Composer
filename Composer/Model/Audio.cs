@@ -28,7 +28,7 @@ namespace Composer.Model
         public AudioDeviceInputNode DeviceInputNode { get; private set; }
         public AudioDeviceOutputNode DeviceOutputNode { get; private set; }
 
-        public uint SamplesPerSecond => Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample;
+        public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
         private Audio()
         {

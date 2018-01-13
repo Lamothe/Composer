@@ -11,8 +11,6 @@ Individual bars can be copied and pasted and then grouped and looped over to cre
 ## TODO
 These are the things that need to be done before the application is "feature complete":
 * Playback marker
-* Delete bar
-* Cut/copy/paste bar
 * Loop bars
 * Save
 * Select BPM, currently fixed at 120
@@ -26,7 +24,8 @@ These are the things that need to be done before the application is "feature com
 
 ## Limitations
 Here are a list features that I'm not planning to implement:
-* Guitar effects (instead, use something like a Boss GT-1)
+* Guitar effects (instead, use something like a Boss GT-1).
+* Synthesized instruments.
 * Compositions with changing time signatures.
 
 Pull requests are welcomed.

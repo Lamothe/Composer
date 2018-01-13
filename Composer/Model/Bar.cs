@@ -16,5 +16,10 @@ namespace Composer.Model
         {
             Update?.Invoke(this, EventArgs.Empty);
         }
+
+        public void SetEmpty()
+        {
+            Buffer = null;
+        }
     }
 }

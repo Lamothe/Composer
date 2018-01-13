@@ -20,17 +20,13 @@ namespace Composer.Model
         public Status Status { get; set; } = Status.Stopped;
 
         public string Name { get; set; }
-        public uint Position { get; set; } = 0;
         public ConcurrentList<Bar> Bars { get; set; } = new ConcurrentList<Bar>();
-        public IEnumerator<Bar> BarEnumerator { get; set; }
-        private Bar WriteBar { get; set; }
-        public uint SamplesPerBar { get; set; }
+        public int SamplesPerBar { get; set; }
         public bool IsMuted { get; set; }
 
         public event EventHandler StatusChanged;
 
-        public delegate void BarEventHandler(object sender, Model.Bar bar);
-        public event BarEventHandler BarAdded;
+        public event EventHandler<Model.Bar> BarAdded;
 
         public Track(string name, Audio audio)
         {
@@ -43,100 +39,90 @@ namespace Composer.Model
 
             audio.DeviceInputNode.AddOutgoingConnection(FrameOutputNode);
             FrameInputNode.AddOutgoingConnection(audio.DeviceOutputNode);
-
-            audio.Graph.QuantumStarted += (g, e) => Write();
-            FrameInputNode.QuantumStarted += (g, e) => Read(e.RequiredSamples);
         }
 
-        public unsafe void Write()
+        public unsafe int Write(int position)
         {
-            using (var frame = FrameOutputNode.GetFrame())
+            var numberOfSamples = 0;
+
+            if (Status == Status.Recording)
             {
-                if (Status == Status.Recording)
+                using (var frame = FrameOutputNode.GetFrame())
                 {
                     using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
                     {
                         using (var reference = buffer.CreateReference())
                         {
                             ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* unsafeBuffer, out uint numberOfBytes);
-                            var numberOfFloats = numberOfBytes / ElementSize;
+                            numberOfSamples = (int)numberOfBytes / ElementSize;
 
-                            if (WriteBar == null || Position + numberOfFloats >= WriteBar.Buffer.Length)
+                            Bar bar = null;
+                            var barIndex = position / SamplesPerBar;
+                            var totalBufferLength = Bars.Count() * SamplesPerBar;
+                            if (barIndex >= Bars.Count() || (position + numberOfSamples) >= totalBufferLength)
                             {
-                                Position = 0;
-                                WriteBar = new Bar
-                                {
-                                    Buffer = new float[SamplesPerBar]
-                                };
-                                Bars.Add(WriteBar);
-                                BarAdded?.Invoke(this, WriteBar);
+                                bar = new Bar { Buffer = new float[SamplesPerBar] };
+                                Bars.Add(bar);
+                                BarAdded?.Invoke(this, bar);
+                            }
+                            else
+                            {
+                                bar = Bars[barIndex];
                             }
 
-                            for (int i = 0; i < numberOfFloats; i++)
+                            var offset = position % SamplesPerBar;
+
+                            for (int i = 0; i < numberOfSamples; i++)
                             {
-                                WriteBar.Buffer[Position + i] = ((float*)unsafeBuffer)[i];
+                                bar.Buffer[offset + i] = ((float*)unsafeBuffer)[i];
                             }
 
-                            Position += numberOfFloats;
-
-                            WriteBar.EmitUpdate();
+                            bar.EmitUpdate();
                         }
                     }
                 }
             }
+
+            return numberOfSamples;
         }
 
-        public unsafe void Read(int numberOfSamples)
+        public unsafe void Read(int position, int numberOfSamples)
         {
             if (Status == Status.Playing)
             {
                 if (numberOfSamples > 0)
                 {
-                    var readBar = BarEnumerator.Current;
-                    var bufferRemaining = readBar.Buffer.Length - Position;
+                    var totalBufferLength = Bars.Count() * SamplesPerBar;
 
-                    if (bufferRemaining <= 0)
+                    if (position >= totalBufferLength)
                     {
-                        if (!BarEnumerator.MoveNext())
-                        {
-                            Stop();
-                            return;
-                        }
-
-                        Position = 0;
-
-                        readBar = BarEnumerator.Current;
-                        bufferRemaining = readBar.Buffer.Length - Position;
-
-                        if (bufferRemaining <= 0)
-                        {
-                            Stop();
-                            return;
-                        }
+                        Stop();
+                        return;
                     }
 
-                    var bufferSize = (uint)Math.Min(numberOfSamples, bufferRemaining);
-                    var bufferSizeInBytes = bufferSize * ElementSize;
+                    var readBarIndex = position / (int)SamplesPerBar;
+                    var readBar = Bars[readBarIndex];
+                    var offset = position % SamplesPerBar;
+                    var bufferSizeInBytes = numberOfSamples * ElementSize;
 
-                    using (var frame = new AudioFrame(bufferSizeInBytes))
+                    using (var frame = new AudioFrame((uint)bufferSizeInBytes))
                     {
                         using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
                         {
                             using (var reference = buffer.CreateReference())
                             {
                                 ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* dataInBytes, out uint capacityInBytes);
-                                var capacity = capacityInBytes / ElementSize;
-                                bufferSize = (uint)Math.Min(bufferSize, capacity);
+                                var capacity = (int)capacityInBytes / ElementSize;
                                 var dataInFloat = (float*)dataInBytes;
-                                for (int i = 0; i < bufferSize; i++)
+                                for (int i = 0; i < capacity; i++)
                                 {
-                                    if (IsMuted)
+                                    if (IsMuted || readBar.Buffer == null)
                                     {
                                         dataInFloat[i] = 0;
                                     }
                                     else
                                     {
-                                        dataInFloat[i] = readBar.Buffer[i + (uint)Position];
+                                        dataInFloat[i] = readBar.Buffer[i + offset];
                                     }
                                 }
                             }
@@ -144,8 +130,6 @@ namespace Composer.Model
 
                         FrameInputNode.AddFrame(frame);
                     }
-
-                    Position += bufferSize;
                 }
             }
         }
@@ -163,13 +147,8 @@ namespace Composer.Model
         {
             if (Status == Status.Stopped)
             {
-                Position = 0;
-                BarEnumerator = Bars.GetEnumerator();
-                if (BarEnumerator.MoveNext())
-                {
-                    FrameInputNode.Start();
-                    ChangeStatus(Status.Playing);
-                }
+                FrameInputNode.Start();
+                ChangeStatus(Status.Playing);
             }
         }
 

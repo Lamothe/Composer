@@ -7,6 +7,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Media.MediaProperties;
 using Windows.Storage.Streams;
 using Windows.UI;
@@ -30,38 +31,67 @@ namespace Composer
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
         private bool ScrollUpdating = false;
-
+        private int QuantumsProcessed = 0;
+        private UI.Bar SelectedBar = null;
         private double Zoom = 0;
+        private KeyboardAccelerator KeyboardAccelerator = new KeyboardAccelerator();
 
         public MainPage()
         {
             this.InitializeComponent();
 
-            Root.KeyUp += (s, e) =>
+            RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
+            PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
+            StopButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S });
+            MetronomeButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.M });
+
+            var copy = new KeyboardAccelerator { Key = Windows.System.VirtualKey.C, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+            copy.Invoked += (s, e) =>
             {
-                if (e.Key == Windows.System.VirtualKey.R)
+                if (SelectedBar != null && SelectedBar.Model != null && SelectedBar.Model.Buffer != null)
                 {
-                    ToggleRecord();
-                }
-                else if (e.Key == Windows.System.VirtualKey.Space)
-                {
-                    TogglePlay();
+                    var dataPackage = new DataPackage
+                    {
+                        RequestedOperation = DataPackageOperation.Copy
+                    };
+                    dataPackage.SetData("PCM", SelectedBar.Model.Buffer);
+                    Clipboard.SetContent(dataPackage);
                 }
             };
+            Root.KeyboardAccelerators.Add(copy);
 
+            var paste = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+            paste.Invoked += async (s, e) =>
+            {
+                if (SelectedBar != null && SelectedBar.Model != null && SelectedBar.Model.Buffer != null)
+                {
+                    var content = Clipboard.GetContent();
+                    if (content.AvailableFormats.Contains("PCM"))
+                    {
+                        var data = await content.GetDataAsync("PCM");
+                        var pcm = data as float[];
+                        pcm.CopyTo(SelectedBar.Model.Buffer, 0);
+                        SelectedBar.QueueUpdate();
+                        SelectedBar.Update();
+                    }
+                }
+            };
+            Root.KeyboardAccelerators.Add(paste);
+ 
             Song = new Song();
-            
-            Song.StatusChanged += (s, e) => { CallUI(() => Status.Text = Song.Status.ToString()); };
+
+            Song.StatusChanged += (s, e) => UpdateStatus();
+            Song.PositionChanged += (s, e) => UpdateStatus();
 
             Tracks.PointerWheelChanged += (s, e) =>
-                {
-                    var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
+            {
+                var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
 
-                    if ((e.KeyModifiers & Windows.System.VirtualKeyModifiers.Control) != 0)
-                    {
-                        Zoom += delta * 0.01;
-                    }
-                };
+                if ((e.KeyModifiers & Windows.System.VirtualKeyModifiers.Control) != 0)
+                {
+                    Zoom += delta * 0.01;
+                }
+            };
 
             var timer = new System.Timers.Timer(100);
             timer.Elapsed += (s, e) =>
@@ -76,6 +106,17 @@ namespace Composer
                 }
             };
             timer.Start();
+        }
+
+        private void UpdateStatus()
+        {
+            if (Song.Status == Model.Status.Stopped)
+            {
+                Stop();
+            }
+
+            var seconds = Song.Position / (decimal)Audio.SamplesPerSecond;
+            CallUI(() => Status.Text = $"{Song.Status.ToString()}: {seconds.ToTimeString()} ({Song.Position})");
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
@@ -113,19 +154,51 @@ namespace Composer
             }
         }
 
+        private object quantumProcessedLocker = new object();
         private UI.Track AddTrack()
         {
             var samplesPerMinute = 60 * Audio.SamplesPerSecond;
 
             var model = new Track(GenerateTrackName(), Audio);
-            model.SamplesPerBar = (uint)(samplesPerMinute * Song.BeatsPerBar) / Song.BeatsPerMinute;
-            Song.AddTrack(model);
+            model.SamplesPerBar = (samplesPerMinute * Song.BeatsPerBar) / Song.BeatsPerMinute;
+            Audio.Graph.QuantumStarted += (g, e) =>
+            {
+                model.Write(Song.Position);
+            };
+            model.FrameInputNode.QuantumStarted += (g, e) =>
+            {
+                model.Read(Song.Position, e.RequiredSamples);
+            };
+            Audio.Graph.QuantumProcessed += (g, e) =>
+            {
+                var unprocessedQuantums = (int)g.CompletedQuantumCount - QuantumsProcessed;
+
+                lock (quantumProcessedLocker)
+                {
+                    if (unprocessedQuantums >= 0)
+                    {
+                        QuantumsProcessed = (int)g.CompletedQuantumCount;
+                    }
+                }
+
+                Song.IncrementPosition(unprocessedQuantums * g.SamplesPerQuantum);
+            };
             model.StatusChanged += (s, e) => Updated = true;
+            Song.AddTrack(model);
 
             var ui = new UI.Track { Model = model };
 
             ui.PointerPressed += (s, e) => SelectTrack(ui);
-            ui.DeleteTrack += (s, e) => DeleteTrack(ui);
+
+            ui.DeleteTrack += (s, e) =>
+            {
+                ui.Model.Stop();
+                Song.Tracks.Remove(ui.Model);
+                Tracks.Children.Remove(ui);
+                int row = 0;
+                Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
+            };
+
             ui.ScrollViewChanged += (s, offset) =>
             {
                 if (!ScrollUpdating)
@@ -153,6 +226,20 @@ namespace Composer
                         SelectTrack(barUI.Track);
                         barUI.Track.SelectBar(barUI);
                     };
+                    barUI.Selected += (s1, e) =>
+                    {
+                        if (SelectedBar != barUI && barUI.IsSelected)
+                        {
+                            SelectedBar = barUI;
+                        }
+                    };
+                    barUI.Deleted += (s1, e) =>
+                    {
+                        if (SelectedBar == barUI)
+                        {
+                            SelectedBar = null;
+                        }
+                    };
                 });
             };
 
@@ -161,15 +248,6 @@ namespace Composer
 
         private async void CallUI(DispatchedHandler x) =>
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, x);
-
-        private void DeleteTrack(UI.Track ui)
-        {
-            ui.Model.Stop();
-            Song.Tracks.Remove(ui.Model);
-            Tracks.Children.Remove(ui);
-            int row = 0;
-            Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
-        }
 
         private void SelectTrack(UI.Track ui)
         {
@@ -230,17 +308,21 @@ namespace Composer
             if (Song.Status == Model.Status.Stopped)
             {
                 var track = AddTrack();
-                track.Model.Record();
-                Song.Record();
                 SelectTrack(track);
+                track.Model.Record();
+
+                Song.Record();
                 Audio.Start();
             }
         }
 
         private void Play()
         {
-            Song.Play();
-            Audio.Start();
+            if (Song.Tracks.Any())
+            {
+                Song.Play();
+                Audio.Start();
+            }
         }
 
         private void Stop()
