@@ -36,9 +36,10 @@ namespace Composer.Model
 
         public static async Task<Audio> Create()
         {
-            var audio = new Audio();
-
-            audio.OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector());
+            var audio = new Audio
+            {
+                OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector())
+            };
 
             var settings = new AudioGraphSettings(AudioRenderCategory.Media)
             {
@@ -71,7 +72,7 @@ namespace Composer.Model
             return audio;
         }
 
-        private static MediaEncodingProfile CreateMediaEncodingProfile(StorageFile file)
+        public static MediaEncodingProfile CreateMediaEncodingProfile(StorageFile file)
         {
             switch (file.FileType.ToString().ToLowerInvariant())
             {

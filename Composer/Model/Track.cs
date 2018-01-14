@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Windows.Media;
 using Windows.Media.Audio;
 using Windows.Media.MediaProperties;
+using Windows.Storage;
 
 namespace Composer.Model
 {
@@ -20,11 +21,12 @@ namespace Composer.Model
         public Status Status { get; set; } = Status.Stopped;
 
         public string Name { get; set; }
-        public ConcurrentList<Bar> Bars { get; set; } = new ConcurrentList<Bar>();
+        public List<Bar> Bars { get; set; } = new List<Bar>();
         public int SamplesPerBar { get; set; }
         public bool IsMuted { get; set; }
 
         public event EventHandler StatusChanged;
+        public event EventHandler Completed;
 
         public event EventHandler<Model.Bar> BarAdded;
 
@@ -39,6 +41,18 @@ namespace Composer.Model
 
             audio.DeviceInputNode.AddOutgoingConnection(FrameOutputNode);
             FrameInputNode.AddOutgoingConnection(audio.DeviceOutputNode);
+        }
+
+        private Bar GetBarAtPosition(int position)
+        {
+            var barIndex = position / SamplesPerBar;
+
+            if (barIndex >= Bars.Count())
+            {
+                return null;
+            }
+
+            return Bars[barIndex];
         }
 
         public unsafe void Write(int position)
@@ -56,25 +70,33 @@ namespace Composer.Model
                             ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* unsafeBuffer, out uint numberOfBytes);
                             var numberOfSamples = (int)numberOfBytes / ElementSize;
 
-                            if (position + numberOfSamples >= + totalBufferLength)
+                            var bar = GetBarAtPosition(position);
+
+                            if (bar == null)
                             {
                                 Stop();
+                                Completed?.Invoke(this, EventArgs.Empty);
                                 return;
                             }
 
-                            var barIndex = position / SamplesPerBar;
-                            var bar = Bars[barIndex];
-
-                            if (bar.Buffer == null)
-                            {
-                                bar.Buffer = new float[SamplesPerBar];
-                            }
-
                             var offset = position % SamplesPerBar;
+                            var remainingSpaceInBuffer = SamplesPerBar - offset;
+                            var length = Math.Min(numberOfSamples, remainingSpaceInBuffer);
 
-                            for (int i = 0; i < numberOfSamples; i++)
+                            bar.Write((float*)unsafeBuffer, 0, offset, length);
+
+                            if (numberOfSamples > remainingSpaceInBuffer)
                             {
-                                bar.Buffer[offset + i] = ((float*)unsafeBuffer)[i];
+                                bar = GetBarAtPosition(position);
+
+                                if (bar == null)
+                                {
+                                    Stop();
+                                    Completed?.Invoke(this, EventArgs.Empty);
+                                    return;
+                                }
+
+                                bar.Write((float*)unsafeBuffer, length, 0, numberOfSamples - remainingSpaceInBuffer);
                             }
 
                             bar.EmitUpdate();
@@ -165,7 +187,7 @@ namespace Composer.Model
 
         public void AddBar()
         {
-            var model = new Model.Bar();
+            var model = new Model.Bar(this);
             Bars.Add(model);
             BarAdded?.Invoke(this, model);
         }

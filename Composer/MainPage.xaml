@@ -17,7 +17,8 @@
             <Button Name="PlayButton" Content="Play/Pause" Click="PlayButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="RecordButton" Content="Record" Click="RecordButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="StopButton" Content="Stop" Click="StopButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
-            <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
+            <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
+            <Button Name="SaveButton" Content="Save" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="SaveButton_Click" />
         </StackPanel>
         <ScrollViewer Grid.Row="1">
             <Grid Name="Tracks"/>

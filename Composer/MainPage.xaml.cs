@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Media.MediaProperties;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Core;
@@ -25,6 +27,7 @@ namespace Composer
 {
     public sealed partial class MainPage : Page
     {
+        private string StoragePath = null;
         private Model.Song Song { get; set; }
         private Model.Audio Audio { get; set; }
         private Model.Metronome Metronome { get; set; }
@@ -34,7 +37,6 @@ namespace Composer
         private int QuantumsProcessed = 0;
         private UI.Bar SelectedBar = null;
         private double Zoom = 0;
-        private KeyboardAccelerator KeyboardAccelerator = new KeyboardAccelerator();
 
         public MainPage()
         {
@@ -44,10 +46,12 @@ namespace Composer
             PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
             StopButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S });
             MetronomeButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.M });
+            SaveButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S, Modifiers = Windows.System.VirtualKeyModifiers.Control });
 
             var copy = new KeyboardAccelerator { Key = Windows.System.VirtualKey.C, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             copy.Invoked += (s, e) =>
             {
+                e.Handled = true;
                 if (SelectedBar != null && SelectedBar.Model != null && SelectedBar.Model.Buffer != null)
                 {
                     var dataPackage = new DataPackage
@@ -58,11 +62,12 @@ namespace Composer
                     Clipboard.SetContent(dataPackage);
                 }
             };
-            Root.KeyboardAccelerators.Add(copy);
+            KeyboardAccelerators.Add(copy);
 
             var paste = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             paste.Invoked += async (s, e) =>
             {
+                e.Handled = true;
                 if (SelectedBar != null && SelectedBar.Model != null)
                 {
                     if (SelectedBar.Model.Buffer == null)
@@ -82,12 +87,47 @@ namespace Composer
                     }
                 }
             };
-            Root.KeyboardAccelerators.Add(paste);
- 
+            KeyboardAccelerators.Add(paste);
+
+            var delete = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Delete };
+            delete.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                if (SelectedBar != null && SelectedBar.Model != null)
+                {
+                    SelectedBar.Model.SetEmpty();
+                }
+            };
+            KeyboardAccelerators.Add(delete);
+
+            var left = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Left };
+            left.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                SelectedBar?.Track.SelectPrevious(SelectedBar);
+            };
+            KeyboardAccelerators.Add(left);
+
+            var right = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Right };
+            right.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                SelectedBar?.Track.SelectNext(SelectedBar);
+            };
+            KeyboardAccelerators.Add(right);
+
+            var save = new KeyboardAccelerator { Key = Windows.System.VirtualKey.S, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+            save.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                Save();
+            };
+            KeyboardAccelerators.Add(save);
+
             Song = new Song();
 
-            Song.StatusChanged += (s, e) => UpdateStatus();
-            Song.PositionChanged += (s, e) => UpdateStatus();
+            Song.StatusChanged += (s, e) => Updated = true;
+            Song.PositionChanged += (s, e) => Updated = true;
 
             Tracks.PointerWheelChanged += (s, e) =>
             {
@@ -99,14 +139,15 @@ namespace Composer
                 }
             };
 
-            var timer = new System.Timers.Timer(100);
-            timer.Elapsed += (s, e) =>
+            var timer = new System.Timers.Timer(200);
+            timer.Elapsed += async (s, e) =>
             {
                 if (Updated)
                 {
                     Updated = false;
-                    CallUI(() =>
+                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                     {
+                        UpdateStatus();
                         Tracks.Children.ToList().ForEach(x => (x as UI.Track).Update());
                     });
                 }
@@ -117,15 +158,12 @@ namespace Composer
         private void UpdateStatus()
         {
             var seconds = Song.Position / (decimal)Audio.SamplesPerSecond;
-            CallUI(() =>
+            if (Song.Status == Model.Status.Stopped)
             {
-                if (Song.Status == Model.Status.Stopped)
-                {
-                    Stop();
-                }
+                Stop();
+            }
 
-                Status.Text = $"{Song.Status.ToString()}: {seconds.ToTimeString()} s";
-            });
+            Status.Text = $"{Song.Status.ToString()}: {seconds.ToTimeString()} s";
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
@@ -144,6 +182,7 @@ namespace Composer
                 RecordButton.IsEnabled = true;
                 StopButton.IsEnabled = true;
                 MetronomeButton.IsEnabled = true;
+                SaveButton.IsEnabled = true;
             }
             catch (Exception)
             {
@@ -196,7 +235,6 @@ namespace Composer
             Song.AddTrack(model);
 
             var ui = new UI.Track { Model = model };
-            ui.PointerPressed += (s, e) => SelectTrack(ui);
 
             ui.DeleteTrack += (s, e) =>
             {
@@ -226,45 +264,32 @@ namespace Composer
             {
                 Updated = true;
                 bar.Update += (s1, e) => Updated = true;
-                CallUI(() =>
+
+                var barUI = ui.AddBar(bar);
+                barUI.PointerPressed += (s1, e) =>
                 {
-                    var barUI = ui.AddBar(bar);
-                    barUI.PointerPressed += (s1, e) =>
+                    barUI.Select(true);
+                };
+                barUI.Selected += (s1, e) =>
+                {
+                    SelectedBar?.Select(false);
+                    SelectedBar = barUI;
+                };
+                barUI.Deleted += (s1, e) =>
+                {
+                    if (SelectedBar == barUI)
                     {
-                        SelectTrack(barUI.Track);
-                        barUI.Track.SelectBar(barUI);
-                    };
-                    barUI.Selected += (s1, e) =>
-                    {
-                        if (SelectedBar != barUI && barUI.IsSelected)
-                        {
-                            SelectedBar = barUI;
-                        }
-                    };
-                    barUI.Deleted += (s1, e) =>
-                    {
-                        if (SelectedBar == barUI)
-                        {
-                            SelectedBar = null;
-                        }
-                    };
-                });
+                        SelectedBar = null;
+                    }
+                };
             };
 
-            for (int count = 0; count < 20; count++)
+            for (int count = 0; count < 100; count++)
             {
                 model.AddBar();
             }
 
             return ui;
-        }
-
-        private async void CallUI(DispatchedHandler x) =>
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, x);
-
-        private void SelectTrack(UI.Track ui)
-        {
-            Tracks.ForEach<UI.Track>(t => t.Select(t == ui));
         }
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
@@ -321,7 +346,6 @@ namespace Composer
             if (Song.Status == Model.Status.Stopped)
             {
                 var track = AddTrack();
-                SelectTrack(track);
                 track.Model.Record();
 
                 Song.Record();
@@ -342,6 +366,40 @@ namespace Composer
         {
             Song.Stop();
             Audio.Stop();
+        }
+
+        private async void Save()
+        {
+            StorageFolder folder = null;
+
+            var folderPicker = new FolderPicker();
+            folderPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            folderPicker.FileTypeFilter.Add("*");
+            folder = await folderPicker.PickSingleFolderAsync();
+            if (folder == null)
+            {
+                return;
+            }
+
+            StoragePath = folder.Name;
+
+            int trackIndex = 0;
+            foreach (var track in Song.Tracks)
+            {
+                var trackFile = await folder.CreateFileAsync($"track{++trackIndex}.mp3", CreationCollisionOption.ReplaceExisting);
+                var fileProfile = Audio.CreateMediaEncodingProfile(trackFile);
+                var fileOutputNodeResult = await Audio.Graph.CreateFileOutputNodeAsync(trackFile, fileProfile);
+                track.FrameInputNode.AddOutgoingConnection(fileOutputNodeResult.FileOutputNode);
+                track.Play();
+                Audio.Start();
+                await fileOutputNodeResult.FileOutputNode.FinalizeAsync();
+            }
+
+        }
+
+        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            Save();
         }
     }
 }

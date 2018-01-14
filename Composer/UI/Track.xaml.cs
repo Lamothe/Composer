@@ -19,7 +19,6 @@ namespace Composer.UI
 {
     public sealed partial class Track : UserControl
     {
-        public bool IsSelected { get; set; }
         public Model.Track Model { get; set; }
         public uint BarWidth { get; set; } = 200;
 
@@ -27,10 +26,8 @@ namespace Composer.UI
         public event EventHandler<double> ScrollViewChanged;
 
         private static Color TrackColor = new Color { A = 0xFF, R = 0x10, G = 0x10, B = 0x10 };
-        private static Color SelectedTrackColor = new Color { A = 0xFF, R = 0x20, G = 0x20, B = 0x20 };
-        private static Color RecordingTrackColor = new Color { A = 0xFF, R = 0x40, G = 0x20, B = 0x20 };
+        private static Color RecordingTrackColor = new Color { A = 0xFF, R = 0x30, G = 0x20, B = 0x20 };
         private static Brush TrackBrush = new SolidColorBrush(TrackColor);
-        private static Brush SelectedTrackBrush = new SolidColorBrush(SelectedTrackColor);
         private static Brush RecordingTrackBrush = new SolidColorBrush(RecordingTrackColor);
 
         public Track()
@@ -54,11 +51,6 @@ namespace Composer.UI
                 return RecordingTrackBrush;
             }
 
-            if (IsSelected)
-            {
-                return SelectedTrackBrush;
-            }
-
             return TrackBrush;
         }
 
@@ -70,7 +62,7 @@ namespace Composer.UI
             }
 
             TrackGrid.Background = GetBackground();
-            Info.Text = $"{Model.Name}\r\n{Model.Status}";
+            Info.Text = $"{Model.Name}";
         }
 
         public UI.Bar AddBar(Model.Bar model)
@@ -90,11 +82,7 @@ namespace Composer.UI
 
             model.Update += (s, e) => ui.QueueUpdate();
 
-            Bars.ColumnDefinitions.Add(new ColumnDefinition
-            {
-                Width = new GridLength(BarWidth)
-            });
-
+            Bars.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarWidth) });
             Grid.SetRow(ui, 0);
             Grid.SetColumn(ui, Bars.Children.Count());
             Bars.Children.Add(ui);
@@ -102,23 +90,27 @@ namespace Composer.UI
             return ui;
         }
 
-        public void Select(bool isSelected)
+        public void UpdateScroll(double horizontalOffset)
         {
-            IsSelected = isSelected;
-            if (!isSelected)
+            Scroll.ChangeView(horizontalOffset, 0, 1, true);
+        }
+
+        public void SelectPrevious(UI.Bar current)
+        {
+            var index = Bars.Children.IndexOf(current);
+            if (index - 1 >= 0)
             {
-                Bars.Children.ToList().ForEach(x => (x as UI.Bar).Select(false));
+                (Bars.Children[index - 1] as UI.Bar).Select(true);
             }
         }
 
-        public void SelectBar(UI.Bar ui)
+        public void SelectNext(UI.Bar current)
         {
-            Bars.Children.ToList().ForEach(x => (x as UI.Bar).Select(x == ui));
-        }
-
-        public void UpdateScroll(double horizontalOffset)
-        {
-            Scroll.ChangeView(horizontalOffset, 0, 1);
+            var index = Bars.Children.IndexOf(current);
+            if (index + 1 < Bars.Children.Count())
+            {
+                (Bars.Children[index + 1] as UI.Bar).Select(true);
+            }
         }
     }
 }
