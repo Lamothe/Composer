@@ -38,16 +38,22 @@ namespace Composer
         public Status AudioStatus { get; set; }
         public int Position { get; set; }
         public int SamplesPerBar { get; set; }
+        public decimal SecondsPerBar { get; set; }
         private Audio RecordingAudio { get; set; }
         private Audio PlaybackAudio { get; set; }
         private object PositionLocker = new object();
+        private SolidColorBrush DefaultBrush = new SolidColorBrush(Colors.WhiteSmoke);
+        private const int NumberOfBars = 100;
+        private const int BarSize = 200;
+        private const int InfoSize = 100;
+        private const int NumberOfTimelineBarsBeforeZero = 1;
+        private const int NumberOfTimelinePixelsBeforeZero = NumberOfTimelineBarsBeforeZero * BarSize;
 
         public event EventHandler AudioStatusChanged;
         public event EventHandler PositionChanged;
 
         private async void CallUI(DispatchedHandler f) =>
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, f);
-
 
         public MainPage()
         {
@@ -156,7 +162,7 @@ namespace Composer
                     CallUI(() =>
                     {
                         UpdateStatus();
-                        Tracks.Children.ToList().ForEach(x => (x as UI.Track).Update());
+                        Tracks.ForEach<UI.Track>(x => x.Update());
                     });
                 }
             };
@@ -168,13 +174,61 @@ namespace Composer
             Load();
         }
 
+        private void DrawTimeline()
+        {
+            Timeline.Children.Clear();
+            var labelSize = 50;
+
+            Timeline.Height = 30;
+            Timeline.Width = NumberOfBars * BarSize + NumberOfTimelinePixelsBeforeZero;
+
+            for (int i = -NumberOfTimelineBarsBeforeZero; i < NumberOfBars; i++)
+            {
+                var line = new Line
+                {
+                    X1 = i * BarSize + NumberOfTimelinePixelsBeforeZero,
+                    Y1 = 20,
+                    X2 = i * BarSize + NumberOfTimelinePixelsBeforeZero,
+                    Y2 = 30,
+                    Stroke = DefaultBrush
+                };
+                Timeline.Children.Add(line);
+
+                var time = i * SecondsPerBar;
+                var timeLabel = new TextBlock
+                {
+                    Text = $"{time.ToTimeString()} s",
+                    Foreground = DefaultBrush,
+                    TextAlignment = TextAlignment.Center,
+                    Width = labelSize,
+                    FontSize = 10
+                };
+                Canvas.SetLeft(timeLabel, i * BarSize - labelSize / 2 + NumberOfTimelinePixelsBeforeZero);
+                Timeline.Children.Add(timeLabel);
+
+                var barLabel = new TextBlock
+                {
+                    Text = i < 0 ? "-" : $"Bar {i + 1}",
+                    Foreground = DefaultBrush,
+                    TextAlignment = TextAlignment.Center,
+                    Width = labelSize,
+                    FontSize = 10
+                };
+                Canvas.SetTop(barLabel, 15);
+                Canvas.SetLeft(barLabel, i * BarSize + BarSize / 2 - labelSize / 2 + NumberOfTimelinePixelsBeforeZero);
+                Timeline.Children.Add(barLabel);
+            }
+        }
+
         private async void Load()
         {
             try
             {
                 var audio = await Audio.Create();
-                var secondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
-                SamplesPerBar = audio.SamplesPerSecond * secondsPerBar;
+                SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
+                SamplesPerBar = (int)(audio.SamplesPerSecond * SecondsPerBar);
+                DrawTimeline();
+                TimelineScroll.ChangeView(500, 0, 1);
 
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
@@ -194,10 +248,6 @@ namespace Composer
             var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
             var seconds = (decimal)(bars * secondsPerBar);
             Status.Text = $"{AudioStatus.ToString()}: {seconds.ToTimeString()} s";
-        }
-
-        private void Page_Loaded(object sender, RoutedEventArgs e)
-        {
         }
 
         private string GenerateTrackName()
@@ -236,6 +286,7 @@ namespace Composer
                 if (!ScrollUpdating)
                 {
                     ScrollUpdating = true;
+                    TimelineScroll.ChangeView(offset + InfoSize, 0, 1);
                     Tracks.ForEach<UI.Track>(x => x.UpdateScroll(offset));
                     ScrollUpdating = false;
                 }
@@ -246,7 +297,7 @@ namespace Composer
             Grid.SetColumn(ui, 0);
             Tracks.Children.Add(ui);
 
-            for (int count = 0; count < 100; count++)
+            for (int count = 0; count < NumberOfBars; count++)
             {
                 var barModel = new Bar { SamplesPerBar = SamplesPerBar };
                 model.Bars.Add(barModel);
