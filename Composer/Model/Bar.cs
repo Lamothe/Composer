@@ -13,35 +13,24 @@ namespace Composer.Model
         public event EventHandler Update;
 
         public float[] Buffer { get; set; }
-        public Track Track { get; private set; }
-
-        public Bar(Track track)
-        {
-            Track = track;
-        }
-
-        public void EmitUpdate()
-        {
-            Update?.Invoke(this, EventArgs.Empty);
-        }
+        public int SamplesPerBar { get; set; }
 
         public void SetEmpty()
         {
             Buffer = null;
-            EmitUpdate();
+            Update?.Invoke(this, EventArgs.Empty);
         }
 
-        public unsafe void Write(float* buffer, int sourceOffset, int destinationOffset, int length)
+        public void Write(float[] buffer, int sourceOffset, int destinationOffset, int length)
         {
             if (Buffer == null)
             {
-                Buffer = new float[Track.SamplesPerBar];
+                Buffer = new float[SamplesPerBar];
             }
 
-            for (int i = 0; i < length; i++)
-            {
-                Buffer[destinationOffset + i] = buffer[sourceOffset + i];
-            }
+            Array.Copy(buffer, sourceOffset, Buffer, destinationOffset, length);
+
+            Update?.Invoke(this, EventArgs.Empty);
         }
     }
 }

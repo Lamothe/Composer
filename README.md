@@ -7,9 +7,8 @@ Individual bars can be copied and pasted and then grouped and looped over to cre
 These are the things that need to be done before the application is "feature complete":
 * Playback marker
 * Loop bars
-* Save
 * Select BPM, currently fixed at 120
-* Select beats per bar, currently set at 4
+* Select beats per bar, currently fixed at 4
 * Metronome
 ### Low priority
 * Track playback volume

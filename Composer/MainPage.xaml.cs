@@ -29,14 +29,25 @@ namespace Composer
     {
         private string StoragePath = null;
         private Model.Song Song { get; set; }
-        private Model.Audio Audio { get; set; }
         private Model.Metronome Metronome { get; set; }
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
-        private bool ScrollUpdating = false;
-        private int QuantumsProcessed = 0;
-        private UI.Bar SelectedBar = null;
-        private double Zoom = 0;
+        private bool ScrollUpdating { get; set; } = false;
+        private UI.Bar SelectedBar { get; set; } = null;
+        private double Zoom { get; set; } = 0;
+        public Status AudioStatus { get; set; }
+        public int Position { get; set; }
+        public int SamplesPerBar { get; set; }
+        private Audio RecordingAudio { get; set; }
+        private Audio PlaybackAudio { get; set; }
+        private object PositionLocker = new object();
+
+        public event EventHandler AudioStatusChanged;
+        public event EventHandler PositionChanged;
+
+        private async void CallUI(DispatchedHandler f) =>
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, f);
+
 
         public MainPage()
         {
@@ -126,9 +137,6 @@ namespace Composer
 
             Song = new Song();
 
-            Song.StatusChanged += (s, e) => Updated = true;
-            Song.PositionChanged += (s, e) => Updated = true;
-
             Tracks.PointerWheelChanged += (s, e) =>
             {
                 var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
@@ -140,12 +148,12 @@ namespace Composer
             };
 
             var timer = new System.Timers.Timer(200);
-            timer.Elapsed += async (s, e) =>
+            timer.Elapsed += (s, e) =>
             {
                 if (Updated)
                 {
                     Updated = false;
-                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    CallUI(() =>
                     {
                         UpdateStatus();
                         Tracks.Children.ToList().ForEach(x => (x as UI.Track).Update());
@@ -153,21 +161,10 @@ namespace Composer
                 }
             };
             timer.Start();
-        }
 
-        private void UpdateStatus()
-        {
-            var seconds = Song.Position / (decimal)Audio.SamplesPerSecond;
-            if (Song.Status == Model.Status.Stopped)
-            {
-                Stop();
-            }
+            AudioStatusChanged += (s, e) => Updated = true;
+            PositionChanged += (s, e) => Updated = true;
 
-            Status.Text = $"{Song.Status.ToString()}: {seconds.ToTimeString()} s";
-        }
-
-        private void Page_Loaded(object sender, RoutedEventArgs e)
-        {
             Load();
         }
 
@@ -175,8 +172,9 @@ namespace Composer
         {
             try
             {
-                Audio = await Model.Audio.Create();
-                Metronome = new Model.Metronome(Audio);
+                var audio = await Audio.Create();
+                var secondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
+                SamplesPerBar = audio.SamplesPerSecond * secondsPerBar;
 
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
@@ -184,10 +182,22 @@ namespace Composer
                 MetronomeButton.IsEnabled = true;
                 SaveButton.IsEnabled = true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Ignore access is denied
+                Status.Text = $"Exception: {ex.Message}";
             }
+        }
+
+        private void UpdateStatus()
+        {
+            var bars = Position / (decimal)SamplesPerBar;
+            var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
+            var seconds = (decimal)(bars * secondsPerBar);
+            Status.Text = $"{AudioStatus.ToString()}: {seconds.ToTimeString()} s";
+        }
+
+        private void Page_Loaded(object sender, RoutedEventArgs e)
+        {
         }
 
         private string GenerateTrackName()
@@ -202,43 +212,19 @@ namespace Composer
             }
         }
 
-        private object QuantumProcessedLocker = new object();
         private UI.Track AddTrack()
         {
-            var samplesPerMinute = 60 * Audio.SamplesPerSecond;
-
-            var model = new Track(GenerateTrackName(), Audio);
-            model.SamplesPerBar = (samplesPerMinute * Song.BeatsPerBar) / Song.BeatsPerMinute;
-            Audio.Graph.QuantumStarted += (g, e) =>
+            var model = new Track
             {
-                model.Write(Song.Position);
+                Name = GenerateTrackName(),
+                SamplesPerBar = SamplesPerBar
             };
-            model.FrameInputNode.QuantumStarted += (g, e) =>
-            {
-                model.Read(Song.Position, e.RequiredSamples);
-            };
-            Audio.Graph.QuantumProcessed += (g, e) =>
-            {
-                var unprocessedQuantums = (int)g.CompletedQuantumCount - QuantumsProcessed;
-
-                lock (QuantumProcessedLocker)
-                {
-                    if (unprocessedQuantums >= 0)
-                    {
-                        QuantumsProcessed = (int)g.CompletedQuantumCount;
-                    }
-                }
-
-                Song.IncrementPosition(unprocessedQuantums * g.SamplesPerQuantum);
-            };
-            model.StatusChanged += (s, e) => Updated = true;
             Song.AddTrack(model);
 
             var ui = new UI.Track { Model = model };
 
             ui.DeleteTrack += (s, e) =>
             {
-                ui.Model.Stop();
                 Song.Tracks.Remove(ui.Model);
                 Tracks.Children.Remove(ui);
                 int row = 0;
@@ -260,33 +246,22 @@ namespace Composer
             Grid.SetColumn(ui, 0);
             Tracks.Children.Add(ui);
 
-            model.BarAdded += (s, bar) =>
+            for (int count = 0; count < 100; count++)
             {
-                Updated = true;
-                bar.Update += (s1, e) => Updated = true;
+                var barModel = new Bar { SamplesPerBar = SamplesPerBar };
+                model.Bars.Add(barModel);
 
-                var barUI = ui.AddBar(bar);
-                barUI.PointerPressed += (s1, e) =>
-                {
-                    barUI.Select(true);
-                };
+                barModel.Update += (s1, e) => Updated = true;
+
+                var barUI = ui.AddBar(barModel);
+
+                barUI.PointerPressed += (s1, e) => barUI.Select(true);
+
                 barUI.Selected += (s1, e) =>
                 {
                     SelectedBar?.Select(false);
                     SelectedBar = barUI;
                 };
-                barUI.Deleted += (s1, e) =>
-                {
-                    if (SelectedBar == barUI)
-                    {
-                        SelectedBar = null;
-                    }
-                };
-            };
-
-            for (int count = 0; count < 100; count++)
-            {
-                model.AddBar();
             }
 
             return ui;
@@ -317,9 +292,14 @@ namespace Composer
             Metronome.Stop();
         }
 
+        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            Save();
+        }
+
         private void ToggleRecord()
         {
-            if (Song.Status == Model.Status.Stopped)
+            if (AudioStatus == Model.Status.Stopped)
             {
                 Record();
             }
@@ -331,7 +311,7 @@ namespace Composer
 
         private void TogglePlay()
         {
-            if (Song.Status == Model.Status.Stopped)
+            if (AudioStatus == Model.Status.Stopped)
             {
                 Play();
             }
@@ -341,40 +321,123 @@ namespace Composer
             }
         }
 
-        private void Record()
+        private void SetPosition(int position)
         {
-            if (Song.Status == Model.Status.Stopped)
-            {
-                var track = AddTrack();
-                track.Model.Record();
+            Position = position;
+            PositionChanged?.Invoke(this, EventArgs.Empty);
+        }
 
-                Song.Record();
-                Audio.Start();
+        private async void Record()
+        {
+            if (AudioStatus == Model.Status.Stopped && RecordingAudio == null && PlaybackAudio == null)
+            {
+                SetPosition(0);
+
+                var track = AddTrack();
+                track.IsRecording = true;
+                RecordingAudio = await Audio.Create();
+                var input = await RecordingAudio.CreateInputDevice();
+                var output = RecordingAudio.CreateFrameOutputNode();
+                input.AddOutgoingConnection(output);
+                RecordingAudio.Graph.QuantumStarted += (g, e) =>
+                {
+                    var samples = Audio.ReadSamplesFromFrame(output);
+                    if (samples != null)
+                    {
+                        if (!track.Model.Write(samples, Position))
+                        {
+                            Stop();
+                        }
+
+                        SetPosition(Position + samples.Length);
+                    }
+                };
+                RecordingAudio.Start();
+
+                SetAudioStatus(Model.Status.Recording);
             }
         }
 
-        private void Play()
+        private async void Play()
         {
-            if (Song.Tracks.Any())
+            if (AudioStatus == Model.Status.Stopped && RecordingAudio == null && PlaybackAudio == null)
             {
-                Song.Play();
-                Audio.Start();
+                if (Song.Tracks.Any())
+                {
+                    SetPosition(0);
+
+                    var lastBarIndex = Song.GetLastNonEmptyBarIndex() + 1;
+                    PlaybackAudio = await Audio.Create();
+                    PlaybackAudio.Graph.QuantumProcessed += (s, e) =>
+                    {
+                        SetPosition((int)PlaybackAudio.Graph.CompletedQuantumCount * PlaybackAudio.Graph.SamplesPerQuantum);
+
+                        if (Position / SamplesPerBar >= lastBarIndex)
+                        {
+                            Stop();
+                        }
+                    };
+
+                    var output = await PlaybackAudio.CreateOutputDevice();
+                    foreach (var track in Song.Tracks)
+                    {
+                        var input = PlaybackAudio.CreateFrameInputNode();
+                        input.AddOutgoingConnection(output);
+                        input.QuantumStarted += (g, e) =>
+                        {
+                            var samples = track.Read(Position, e.RequiredSamples);
+                            using (var frame = Audio.GenerateFrameFromSamples(samples))
+                            {
+                                input.AddFrame(frame);
+                            }
+                        };
+                        input.Start();
+                    }
+                    PlaybackAudio.Start();
+                    SetAudioStatus(Model.Status.Playing);
+                }
             }
         }
 
         private void Stop()
         {
-            Song.Stop();
-            Audio.Stop();
+            if (RecordingAudio != null)
+            {
+                Tracks.ForEach<UI.Track>(x => x.IsRecording = false);
+                RecordingAudio.Stop();
+                RecordingAudio.Dispose();
+                RecordingAudio = null;
+            }
+
+            if (PlaybackAudio != null)
+            {
+                PlaybackAudio.Stop();
+                PlaybackAudio.Dispose();
+                PlaybackAudio = null;
+            }
+
+            SetAudioStatus(Model.Status.Stopped);
+        }
+
+        private void SetAudioStatus(Status status)
+        {
+            if (AudioStatus != status)
+            {
+                AudioStatus = status;
+                AudioStatusChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private async void Save()
         {
             StorageFolder folder = null;
 
-            var folderPicker = new FolderPicker();
-            folderPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            var folderPicker = new FolderPicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
             folderPicker.FileTypeFilter.Add("*");
+
             folder = await folderPicker.PickSingleFolderAsync();
             if (folder == null)
             {
@@ -383,23 +446,56 @@ namespace Composer
 
             StoragePath = folder.Name;
 
-            int trackIndex = 0;
+            var lastBarIndex = Song.GetLastNonEmptyBarIndex() + 1;
+            var saveAudio = await Audio.Create();
+            var position = 0;
+            var trackIndex = 0;
+
             foreach (var track in Song.Tracks)
             {
                 var trackFile = await folder.CreateFileAsync($"track{++trackIndex}.mp3", CreationCollisionOption.ReplaceExisting);
                 var fileProfile = Audio.CreateMediaEncodingProfile(trackFile);
-                var fileOutputNodeResult = await Audio.Graph.CreateFileOutputNodeAsync(trackFile, fileProfile);
-                track.FrameInputNode.AddOutgoingConnection(fileOutputNodeResult.FileOutputNode);
-                track.Play();
-                Audio.Start();
-                await fileOutputNodeResult.FileOutputNode.FinalizeAsync();
+                var fileOutputNodeResult = await saveAudio.Graph.CreateFileOutputNodeAsync(trackFile, fileProfile);
+                if (fileOutputNodeResult.Status != Windows.Media.Audio.AudioFileNodeCreationStatus.Success)
+                {
+                    throw new Exception("Failed to create file output node");
+                }
+                var output = fileOutputNodeResult.FileOutputNode;
+                var input = saveAudio.CreateFrameInputNode();
+                input.AddOutgoingConnection(output);
+                input.QuantumStarted += (g, e) =>
+                {
+                    var samples = track.Read(position, e.RequiredSamples);
+                    using (var frame = Audio.GenerateFrameFromSamples(samples))
+                    {
+                        input.AddFrame(frame);
+                    }
+                };
+                input.Start();
             }
 
-        }
+            var locker = new object();
+            saveAudio.Graph.QuantumProcessed += (s, e) =>
+            {
+                lock (locker)
+                {
+                    if (saveAudio != null)
+                    {
+                        position = (int)saveAudio.Graph.CompletedQuantumCount * saveAudio.Graph.SamplesPerQuantum;
 
-        private void SaveButton_Click(object sender, RoutedEventArgs e)
-        {
-            Save();
+                        if (position / SamplesPerBar >= lastBarIndex)
+                        {
+                            saveAudio.Stop();
+                            saveAudio.Dispose();
+                            saveAudio = null;
+
+                            CallUI(() => Status.Text = $"Song saved to {StoragePath}");
+                        }
+                    }
+                }
+            };
+
+            saveAudio.Graph.Start();
         }
     }
 }

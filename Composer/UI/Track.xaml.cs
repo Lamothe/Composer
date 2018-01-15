@@ -21,6 +21,7 @@ namespace Composer.UI
     {
         public Model.Track Model { get; set; }
         public uint BarWidth { get; set; } = 200;
+        public bool IsRecording { get; set; }
 
         public event EventHandler DeleteTrack;
         public event EventHandler<double> ScrollViewChanged;
@@ -44,16 +45,6 @@ namespace Composer.UI
             MuteButton.Unchecked += (s, e) => Model.IsMuted = false;
         }
 
-        private Brush GetBackground()
-        {
-            if (Model.Status == Composer.Model.Status.Recording)
-            {
-                return RecordingTrackBrush;
-            }
-
-            return TrackBrush;
-        }
-
         public void Update()
         {
             foreach (var ui in Bars.Children)
@@ -61,7 +52,7 @@ namespace Composer.UI
                 (ui as UI.Bar).Update();
             }
 
-            TrackGrid.Background = GetBackground();
+            TrackGrid.Background = IsRecording ? RecordingTrackBrush : TrackBrush;
             Info.Text = $"{Model.Name}";
         }
 

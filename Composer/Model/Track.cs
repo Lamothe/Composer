@@ -13,37 +13,12 @@ namespace Composer.Model
 {
     public class Track
     {
-        private const int ElementSize = sizeof(float);
-
-        public AudioFrameInputNode FrameInputNode { get; set; }
-        public AudioFrameOutputNode FrameOutputNode { get; set; }
-
-        public Status Status { get; set; } = Status.Stopped;
-
         public string Name { get; set; }
         public List<Bar> Bars { get; set; } = new List<Bar>();
         public int SamplesPerBar { get; set; }
         public bool IsMuted { get; set; }
 
-        public event EventHandler StatusChanged;
-        public event EventHandler Completed;
-
-        public event EventHandler<Model.Bar> BarAdded;
-
-        public Track(string name, Audio audio)
-        {
-            var encodingProperties = audio.Graph.EncodingProperties;
-            encodingProperties.ChannelCount = 1;
-
-            Name = name;
-            FrameInputNode = audio.Graph.CreateFrameInputNode(encodingProperties);
-            FrameOutputNode = audio.Graph.CreateFrameOutputNode(encodingProperties);
-
-            audio.DeviceInputNode.AddOutgoingConnection(FrameOutputNode);
-            FrameInputNode.AddOutgoingConnection(audio.DeviceOutputNode);
-        }
-
-        private Bar GetBarAtPosition(int position)
+        public Bar GetBarAtPosition(int position)
         {
             var barIndex = position / SamplesPerBar;
 
@@ -55,141 +30,58 @@ namespace Composer.Model
             return Bars[barIndex];
         }
 
-        public unsafe void Write(int position)
+        public float[] Read(int position, int numberOfSamples)
         {
-            if (Status == Status.Recording)
-            {
-                var totalBufferLength = Bars.Count() * SamplesPerBar;
+            var totalBufferLength = Bars.Count() * SamplesPerBar;
+            var bar = GetBarAtPosition(position);
 
-                using (var frame = FrameOutputNode.GetFrame())
+            if (bar == null)
+            {
+                return null;
+            }
+
+            if (IsMuted || bar.Buffer == null)
+            {
+                return new float[numberOfSamples];
+            }
+
+            var offset = position % SamplesPerBar;
+
+            var length = Math.Min(numberOfSamples, bar.Buffer.Length - offset);
+
+            var buffer = new float[length];
+            Array.Copy(bar.Buffer, offset, buffer, 0, length);
+            return buffer;
+        }
+
+        public bool Write(float[] samples, int position)
+        {
+            var bar = GetBarAtPosition(position);
+
+            if (bar == null)
+            {
+                return false;
+            }
+
+            var offset = position % SamplesPerBar;
+            var remainingSpaceInBuffer = SamplesPerBar - offset;
+            var length = Math.Min(samples.Length, remainingSpaceInBuffer);
+
+            bar.Write(samples, 0, offset, length);
+
+            if (samples.Length > remainingSpaceInBuffer)
+            {
+                bar = GetBarAtPosition(position);
+
+                if (bar == null)
                 {
-                    using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
-                    {
-                        using (var reference = buffer.CreateReference())
-                        {
-                            ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* unsafeBuffer, out uint numberOfBytes);
-                            var numberOfSamples = (int)numberOfBytes / ElementSize;
-
-                            var bar = GetBarAtPosition(position);
-
-                            if (bar == null)
-                            {
-                                Stop();
-                                Completed?.Invoke(this, EventArgs.Empty);
-                                return;
-                            }
-
-                            var offset = position % SamplesPerBar;
-                            var remainingSpaceInBuffer = SamplesPerBar - offset;
-                            var length = Math.Min(numberOfSamples, remainingSpaceInBuffer);
-
-                            bar.Write((float*)unsafeBuffer, 0, offset, length);
-
-                            if (numberOfSamples > remainingSpaceInBuffer)
-                            {
-                                bar = GetBarAtPosition(position);
-
-                                if (bar == null)
-                                {
-                                    Stop();
-                                    Completed?.Invoke(this, EventArgs.Empty);
-                                    return;
-                                }
-
-                                bar.Write((float*)unsafeBuffer, length, 0, numberOfSamples - remainingSpaceInBuffer);
-                            }
-
-                            bar.EmitUpdate();
-                        }
-                    }
+                    return false;
                 }
+
+                bar.Write(samples, length, 0, samples.Length - remainingSpaceInBuffer);
             }
-        }
 
-        public unsafe void Read(int position, int numberOfSamples)
-        {
-            if (Status == Status.Playing)
-            {
-                if (numberOfSamples > 0)
-                {
-                    var totalBufferLength = Bars.Count() * SamplesPerBar;
-
-                    if (position >= totalBufferLength)
-                    {
-                        Stop();
-                        return;
-                    }
-
-                    var readBarIndex = position / (int)SamplesPerBar;
-                    var readBar = Bars[readBarIndex];
-                    var offset = position % SamplesPerBar;
-                    var bufferSizeInBytes = numberOfSamples * ElementSize;
-
-                    using (var frame = new AudioFrame((uint)bufferSizeInBytes))
-                    {
-                        using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
-                        {
-                            using (var reference = buffer.CreateReference())
-                            {
-                                ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* dataInBytes, out uint capacityInBytes);
-                                var capacity = (int)capacityInBytes / ElementSize;
-                                var dataInFloat = (float*)dataInBytes;
-                                for (int i = 0; i < capacity; i++)
-                                {
-                                    if (IsMuted || readBar.Buffer == null)
-                                    {
-                                        dataInFloat[i] = 0;
-                                    }
-                                    else
-                                    {
-                                        dataInFloat[i] = readBar.Buffer[i + offset];
-                                    }
-                                }
-                            }
-                        }
-
-                        FrameInputNode.AddFrame(frame);
-                    }
-                }
-            }
-        }
-
-        public void Record()
-        {
-            if (Status == Status.Stopped)
-            {
-                FrameOutputNode.Start();
-                ChangeStatus(Status.Recording);
-            }
-        }
-
-        public void Play()
-        {
-            if (Status == Status.Stopped)
-            {
-                FrameInputNode.Start();
-                ChangeStatus(Status.Playing);
-            }
-        }
-
-        public void Stop()
-        {
-            FrameInputNode.Stop();
-            FrameOutputNode.Stop();
-            ChangeStatus(Status.Stopped);
-        }
-
-        private void ChangeStatus(Status status)
-        {
-            Status = status;
-            StatusChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        public void AddBar()
-        {
-            var model = new Model.Bar(this);
-            Bars.Add(model);
-            BarAdded?.Invoke(this, model);
+            return true;
         }
     }
 }

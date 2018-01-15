@@ -102,7 +102,6 @@
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Model\Bar.cs" />
-    <Compile Include="Model\IMemoryBufferByteAccess.cs" />
     <Compile Include="Model\Status.cs" />
     <Compile Include="Model\Metronome.cs" />
     <Compile Include="Model\Track.cs" />
