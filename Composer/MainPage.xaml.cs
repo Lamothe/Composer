@@ -8,6 +8,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
+using Windows.Media.Audio;
 using Windows.Media.MediaProperties;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -46,8 +48,8 @@ namespace Composer
         private const int NumberOfBars = 100;
         private const int BarSize = 200;
         private const int InfoSize = 100;
-        private const int NumberOfTimelineBarsBeforeZero = 1;
-        private const int NumberOfTimelinePixelsBeforeZero = NumberOfTimelineBarsBeforeZero * BarSize;
+        private const int InfoMargin = 4; // 2L +  2R
+        private const int BarMargin = 2;
 
         public event EventHandler AudioStatusChanged;
         public event EventHandler PositionChanged;
@@ -58,6 +60,8 @@ namespace Composer
         public MainPage()
         {
             this.InitializeComponent();
+
+            Status.Text = "Initialising ...";
 
             RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
             PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
@@ -89,8 +93,7 @@ namespace Composer
                 {
                     if (SelectedBar.Model.Buffer == null)
                     {
-                        var samplesPerBar = SelectedBar.Track.Model.SamplesPerBar;
-                        SelectedBar.Model.Buffer = new float[samplesPerBar];
+                        SelectedBar.Model.Buffer = new float[SamplesPerBar];
                     }
 
                     var content = Clipboard.GetContent();
@@ -180,18 +183,13 @@ namespace Composer
             var labelSize = 50;
 
             Timeline.Height = 30;
-            Timeline.Width = NumberOfBars * BarSize + NumberOfTimelinePixelsBeforeZero;
+            Timeline.Width = NumberOfBars * BarSize;
+            var offset = InfoSize + InfoMargin /2 + BarMargin / 2;
 
-            for (int i = -NumberOfTimelineBarsBeforeZero; i < NumberOfBars; i++)
+            for (int i = 0; i < NumberOfBars; i++)
             {
-                var line = new Line
-                {
-                    X1 = i * BarSize + NumberOfTimelinePixelsBeforeZero,
-                    Y1 = 20,
-                    X2 = i * BarSize + NumberOfTimelinePixelsBeforeZero,
-                    Y2 = 30,
-                    Stroke = DefaultBrush
-                };
+                var x = i * BarSize + offset;
+                var line = new Line { X1 = x, Y1 = 20, X2 = x, Y2 = 30, Stroke = DefaultBrush };
                 Timeline.Children.Add(line);
 
                 var time = i * SecondsPerBar;
@@ -203,7 +201,7 @@ namespace Composer
                     Width = labelSize,
                     FontSize = 10
                 };
-                Canvas.SetLeft(timeLabel, i * BarSize - labelSize / 2 + NumberOfTimelinePixelsBeforeZero);
+                Canvas.SetLeft(timeLabel, i * BarSize - labelSize / 2 + offset);
                 Timeline.Children.Add(timeLabel);
 
                 var barLabel = new TextBlock
@@ -214,8 +212,8 @@ namespace Composer
                     Width = labelSize,
                     FontSize = 10
                 };
-                Canvas.SetTop(barLabel, 15);
-                Canvas.SetLeft(barLabel, i * BarSize + BarSize / 2 - labelSize / 2 + NumberOfTimelinePixelsBeforeZero);
+                Canvas.SetTop(barLabel, 10);
+                Canvas.SetLeft(barLabel, i * BarSize + BarSize / 2 - labelSize / 2 + offset);
                 Timeline.Children.Add(barLabel);
             }
         }
@@ -224,17 +222,25 @@ namespace Composer
         {
             try
             {
-                var audio = await Audio.Create();
+                PlaybackAudio = await Audio.Create();
+                PlaybackAudio.PositionUpdated += (s, position) => SetPosition(position);
+                PlaybackAudio.Completed += (s, e) => CallUI(() => Stop());
+
+                RecordingAudio = await Audio.Create();
+                RecordingAudio.PositionUpdated += (s, position) => SetPosition(position);
+                RecordingAudio.Completed += (s, e) => CallUI(() => Stop());
+
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
-                SamplesPerBar = (int)(audio.SamplesPerSecond * SecondsPerBar);
+                SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
                 DrawTimeline();
-                TimelineScroll.ChangeView(500, 0, 1);
 
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
                 StopButton.IsEnabled = true;
                 MetronomeButton.IsEnabled = true;
                 SaveButton.IsEnabled = true;
+
+                Status.Text = "Ready";
             }
             catch (Exception ex)
             {
@@ -262,6 +268,17 @@ namespace Composer
             }
         }
 
+        private void UpdateHorizontalPosition(double offset)
+        {
+            if (!ScrollUpdating)
+            {
+                ScrollUpdating = true;
+                TimelineScroll.ChangeView(offset, 0, 1, true);
+                Tracks.ForEach<UI.Track>(x => x.UpdateScroll(offset));
+                ScrollUpdating = false;
+            }
+        }
+
         private UI.Track AddTrack()
         {
             var model = new Track
@@ -275,22 +292,15 @@ namespace Composer
 
             ui.DeleteTrack += (s, e) =>
             {
+                Stop();
                 Song.Tracks.Remove(ui.Model);
                 Tracks.Children.Remove(ui);
                 int row = 0;
                 Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
             };
 
-            ui.ScrollViewChanged += (s, offset) =>
-            {
-                if (!ScrollUpdating)
-                {
-                    ScrollUpdating = true;
-                    TimelineScroll.ChangeView(offset + InfoSize, 0, 1);
-                    Tracks.ForEach<UI.Track>(x => x.UpdateScroll(offset));
-                    ScrollUpdating = false;
-                }
-            };
+            ui.HorizontalPositionChanged += (s, offset) => UpdateHorizontalPosition(offset);
+            TimelineScroll.ViewChanged += (s, e) => UpdateHorizontalPosition(TimelineScroll.HorizontalOffset);
 
             Tracks.RowDefinitions.Add(new RowDefinition { Height = new GridLength(100) });
             Grid.SetRow(ui, Tracks.Children.Count());
@@ -378,96 +388,40 @@ namespace Composer
             PositionChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private async void Record()
+        private void Record()
         {
-            if (AudioStatus == Model.Status.Stopped && RecordingAudio == null && PlaybackAudio == null)
+            if (AudioStatus == Model.Status.Stopped)
             {
                 SetPosition(0);
 
                 var track = AddTrack();
                 track.IsRecording = true;
-                RecordingAudio = await Audio.Create();
-                var input = await RecordingAudio.CreateInputDevice();
-                var output = RecordingAudio.CreateFrameOutputNode();
-                input.AddOutgoingConnection(output);
-                RecordingAudio.Graph.QuantumStarted += (g, e) =>
-                {
-                    var samples = Audio.ReadSamplesFromFrame(output);
-                    if (samples != null)
-                    {
-                        if (!track.Model.Write(samples, Position))
-                        {
-                            Stop();
-                        }
-
-                        SetPosition(Position + samples.Length);
-                    }
-                };
-                RecordingAudio.Start();
-
+                RecordingAudio.Record(track.Model);
                 SetAudioStatus(Model.Status.Recording);
             }
         }
 
-        private async void Play()
+        private void Play()
         {
-            if (AudioStatus == Model.Status.Stopped && RecordingAudio == null && PlaybackAudio == null)
+            if (AudioStatus == Model.Status.Stopped)
             {
                 if (Song.Tracks.Any())
                 {
-                    SetPosition(0);
-
-                    var lastBarIndex = Song.GetLastNonEmptyBarIndex() + 1;
-                    PlaybackAudio = await Audio.Create();
-                    PlaybackAudio.Graph.QuantumProcessed += (s, e) =>
-                    {
-                        SetPosition((int)PlaybackAudio.Graph.CompletedQuantumCount * PlaybackAudio.Graph.SamplesPerQuantum);
-
-                        if (Position / SamplesPerBar >= lastBarIndex)
-                        {
-                            Stop();
-                        }
-                    };
-
-                    var output = await PlaybackAudio.CreateOutputDevice();
-                    foreach (var track in Song.Tracks)
-                    {
-                        var input = PlaybackAudio.CreateFrameInputNode();
-                        input.AddOutgoingConnection(output);
-                        input.QuantumStarted += (g, e) =>
-                        {
-                            var samples = track.Read(Position, e.RequiredSamples);
-                            using (var frame = Audio.GenerateFrameFromSamples(samples))
-                            {
-                                input.AddFrame(frame);
-                            }
-                        };
-                        input.Start();
-                    }
-                    PlaybackAudio.Start();
-                    SetAudioStatus(Model.Status.Playing);
+                    PlaybackAudio.Play(Song);
                 }
             }
         }
 
         private void Stop()
         {
-            if (RecordingAudio != null)
+            if (AudioStatus != Model.Status.Stopped)
             {
                 Tracks.ForEach<UI.Track>(x => x.IsRecording = false);
                 RecordingAudio.Stop();
-                RecordingAudio.Dispose();
-                RecordingAudio = null;
-            }
-
-            if (PlaybackAudio != null)
-            {
                 PlaybackAudio.Stop();
-                PlaybackAudio.Dispose();
-                PlaybackAudio = null;
-            }
 
-            SetAudioStatus(Model.Status.Stopped);
+                SetAudioStatus(Model.Status.Stopped);
+            }
         }
 
         private void SetAudioStatus(Status status)
@@ -504,10 +458,11 @@ namespace Composer
 
             foreach (var track in Song.Tracks)
             {
-                var trackFile = await folder.CreateFileAsync($"track{++trackIndex}.mp3", CreationCollisionOption.ReplaceExisting);
+                var fileName = $"track{++trackIndex}.wav";
+                var trackFile = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
                 var fileProfile = Audio.CreateMediaEncodingProfile(trackFile);
                 var fileOutputNodeResult = await saveAudio.Graph.CreateFileOutputNodeAsync(trackFile, fileProfile);
-                if (fileOutputNodeResult.Status != Windows.Media.Audio.AudioFileNodeCreationStatus.Success)
+                if (fileOutputNodeResult.Status != AudioFileNodeCreationStatus.Success)
                 {
                     throw new Exception("Failed to create file output node");
                 }

@@ -37,6 +37,9 @@ namespace Composer.Model
         public AudioDeviceInputNode DeviceInputNode { get; private set; }
         public AudioDeviceOutputNode DeviceOutputNode { get; private set; }
         private const int ElementSize = sizeof(float);
+        public event EventHandler Stopped;
+        public event EventHandler<int> PositionUpdated;
+        public event EventHandler Completed;
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
@@ -125,6 +128,13 @@ namespace Composer.Model
         public void Stop()
         {
             Graph.Stop();
+            Graph.ResetAllNodes();
+            Stopped?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Reset()
+        {
+            Graph.ResetAllNodes();
         }
 
         public static unsafe float[] ReadSamplesFromFrame(AudioFrameOutputNode frameOutputNode)
@@ -186,6 +196,102 @@ namespace Composer.Model
             {
                 Graph.Dispose();
             }
+        }
+
+        public async void Record(Track track)
+        {
+            var input = await CreateInputDevice();
+            var output = CreateFrameOutputNode();
+            input.AddOutgoingConnection(output);
+
+            var position = 0;
+            void quantumStarted(AudioGraph s, object e)
+            {
+                var samples = ReadSamplesFromFrame(output);
+                if (samples != null)
+                {
+                    if (!track.Write(samples, position))
+                    {
+                        Stop();
+                        Completed?.Invoke(this, EventArgs.Empty);
+                    }
+
+                    position += samples.Length;
+
+                    PositionUpdated?.Invoke(this, position);
+                }
+            }
+
+            void stopped(object sender, EventArgs e)
+            {
+                input.Dispose();
+                output.Dispose();
+                Graph.QuantumStarted -= quantumStarted;
+                Stopped -= stopped;
+            };
+
+            Stopped += stopped;
+            Graph.QuantumStarted += quantumStarted;
+
+            Start();
+        }
+
+        public async void Play(Song song)
+        {
+            if (!song.Tracks.Any())
+            {
+                throw new Exception("Song does not have any tracks");
+            }
+
+            var position = 0;
+            var output = await CreateOutputDevice();
+            var lastBarIndex = song.GetLastNonEmptyBarIndex() + 1;
+
+            void quantumProcessed(AudioGraph sender, object o)
+            {
+                position = (int)Graph.CompletedQuantumCount * Graph.SamplesPerQuantum;
+                PositionUpdated?.Invoke(this, position);
+
+                if (position / song.Tracks.First().SamplesPerBar >= lastBarIndex)
+                {
+                    Stop();
+                    Completed?.Invoke(this, EventArgs.Empty);
+                }
+            }
+
+            Graph.QuantumProcessed += quantumProcessed;
+
+            void stopped(object sender, EventArgs e)
+            {
+                Graph.QuantumProcessed -= quantumProcessed;
+                output.Dispose();
+                Stopped -= stopped;
+            };
+
+            Stopped += stopped;
+
+            foreach (var track in song.Tracks)
+            {
+                var input = CreateFrameInputNode();
+                input.AddOutgoingConnection(output);
+                input.QuantumStarted += (g, e) =>
+                {
+                    var samples = track.Read(position, e.RequiredSamples);
+                    using (var frame = GenerateFrameFromSamples(samples))
+                    {
+                        input.AddFrame(frame);
+                    }
+                };
+                void inputStopped(object sender, EventArgs e)
+                {
+                    input.Dispose();
+                    Stopped -= inputStopped;
+                }
+                Stopped += inputStopped;
+                input.Start();
+            }
+
+            Start();
         }
     }
 }

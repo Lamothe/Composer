@@ -24,7 +24,7 @@ namespace Composer.UI
         public bool IsRecording { get; set; }
 
         public event EventHandler DeleteTrack;
-        public event EventHandler<double> ScrollViewChanged;
+        public event EventHandler<double> HorizontalPositionChanged;
 
         private static Color TrackColor = new Color { A = 0xFF, R = 0x10, G = 0x10, B = 0x10 };
         private static Color RecordingTrackColor = new Color { A = 0xFF, R = 0x30, G = 0x20, B = 0x20 };
@@ -40,7 +40,7 @@ namespace Composer.UI
                 Bars.ForEach<UI.Bar>(x => x.Delete());
                 DeleteTrack?.Invoke(this, EventArgs.Empty);
             };
-            Scroll.ViewChanged += (s, e) => ScrollViewChanged?.Invoke(this, Scroll.HorizontalOffset);
+            Scroll.ViewChanged += (s, e) => HorizontalPositionChanged?.Invoke(this, Scroll.HorizontalOffset);
             MuteButton.Checked += (s, e) => Model.IsMuted = true;
             MuteButton.Unchecked += (s, e) => Model.IsMuted = false;
         }
@@ -102,6 +102,11 @@ namespace Composer.UI
             {
                 (Bars.Children[index + 1] as UI.Bar).Select(true);
             }
+        }
+
+        public void ScrollToElement(UI.Bar bar)
+        {
+            Scroll.ScrollToElement(bar, false);
         }
     }
 }

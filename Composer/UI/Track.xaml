@@ -20,7 +20,7 @@
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <TextBlock Name="Info" Text="Info" TextWrapping="Wrap" Grid.Row="0" />
+            <TextBlock Name="Info" Text="Info" TextWrapping="Wrap" Grid.Row="0" Margin="5" />
             <ToggleButton Name="MuteButton" Content="Mute" Grid.Row="1" HorizontalAlignment="Stretch" />
         </Grid>
         <ScrollViewer Name="Scroll" Grid.Column="1" VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden">

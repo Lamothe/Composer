@@ -21,14 +21,14 @@
             <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="SaveButton" Content="Save" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="SaveButton_Click" />
         </StackPanel>
-        <ScrollViewer Name="TimelineScroll" Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Disabled">
-            <Canvas Name="Timeline" />
+        <ScrollViewer Name="TimelineScroll" Grid.Row="1" Background="#FF202020" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled">
+            <Canvas Name="Timeline" Margin="0,2,0,0"/>
         </ScrollViewer>
         <ScrollViewer Grid.Row="2">
             <Grid Name="Tracks"/>
         </ScrollViewer>
-        <Grid Grid.Row="3" BorderBrush="#FF404040" BorderThickness="1" Background="#FF202020">
-            <TextBlock Name="Status" />
+        <Grid Grid.Row="3" Background="#FF202020">
+            <TextBlock Name="Status" Margin="5" />
         </Grid>
     </Grid>
 </Page>
