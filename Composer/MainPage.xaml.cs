@@ -184,7 +184,7 @@ namespace Composer
 
             Timeline.Height = 30;
             Timeline.Width = NumberOfBars * BarSize;
-            var offset = InfoSize + InfoMargin /2 + BarMargin / 2;
+            var offset = InfoSize + InfoMargin / 2 + BarMargin / 2;
 
             for (int i = 0; i < NumberOfBars; i++)
             {
@@ -451,57 +451,16 @@ namespace Composer
 
             StoragePath = folder.Name;
 
-            var lastBarIndex = Song.GetLastNonEmptyBarIndex() + 1;
-            var saveAudio = await Audio.Create();
-            var position = 0;
+            Status.Text = "Saving ...";
             var trackIndex = 0;
-
             foreach (var track in Song.Tracks)
             {
-                var fileName = $"track{++trackIndex}.wav";
-                var trackFile = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
-                var fileProfile = Audio.CreateMediaEncodingProfile(trackFile);
-                var fileOutputNodeResult = await saveAudio.Graph.CreateFileOutputNodeAsync(trackFile, fileProfile);
-                if (fileOutputNodeResult.Status != AudioFileNodeCreationStatus.Success)
-                {
-                    throw new Exception("Failed to create file output node");
-                }
-                var output = fileOutputNodeResult.FileOutputNode;
-                var input = saveAudio.CreateFrameInputNode();
-                input.AddOutgoingConnection(output);
-                input.QuantumStarted += (g, e) =>
-                {
-                    var samples = track.Read(position, e.RequiredSamples);
-                    using (var frame = Audio.GenerateFrameFromSamples(samples))
-                    {
-                        input.AddFrame(frame);
-                    }
-                };
-                input.Start();
+                var lastBarIndex = track.GetLastNonEmptyBarIndex() + 1;
+                var fileName = $"track{++trackIndex}.pcm";
+                var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+                Audio.SaveTrack(track, file);
             }
-
-            var locker = new object();
-            saveAudio.Graph.QuantumProcessed += (s, e) =>
-            {
-                lock (locker)
-                {
-                    if (saveAudio != null)
-                    {
-                        position = (int)saveAudio.Graph.CompletedQuantumCount * saveAudio.Graph.SamplesPerQuantum;
-
-                        if (position / SamplesPerBar >= lastBarIndex)
-                        {
-                            saveAudio.Stop();
-                            saveAudio.Dispose();
-                            saveAudio = null;
-
-                            CallUI(() => Status.Text = $"Song saved to {StoragePath}");
-                        }
-                    }
-                }
-            };
-
-            saveAudio.Graph.Start();
+            Status.Text = $"Saved to {StoragePath}";
         }
     }
 }

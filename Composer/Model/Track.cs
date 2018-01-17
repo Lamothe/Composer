@@ -30,6 +30,22 @@ namespace Composer.Model
             return Bars[barIndex];
         }
 
+        public int GetLastNonEmptyBarIndex()
+        {
+            int lastBarIndex = 0;
+
+            for (int barIndex = 0; barIndex < Bars.Count(); barIndex++)
+            {
+                var bar = Bars[barIndex];
+                if (bar.Buffer != null && barIndex > lastBarIndex)
+                {
+                    lastBarIndex = barIndex;
+                }
+            }
+
+            return lastBarIndex;
+        }
+
         public float[] Read(int position, int numberOfSamples)
         {
             var totalBufferLength = Bars.Count() * SamplesPerBar;

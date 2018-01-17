@@ -19,21 +19,7 @@ namespace Composer.Model
 
         public int GetLastNonEmptyBarIndex()
         {
-            int lastBarIndex = 0;
-
-            foreach (var track in Tracks)
-            {
-                for (int barIndex = 0; barIndex < track.Bars.Count(); barIndex++)
-                {
-                    var bar = track.Bars[barIndex];
-                    if (bar.Buffer != null && barIndex > lastBarIndex)
-                    {
-                        lastBarIndex = barIndex;
-                    }
-                }
-            }
-
-            return lastBarIndex;
+           return Tracks.Max(track => track.GetLastNonEmptyBarIndex());
         }
     }
 }
