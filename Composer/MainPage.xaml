@@ -22,7 +22,7 @@
             <Button Name="SaveButton" Content="Save" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="SaveButton_Click" />
         </StackPanel>
         <ScrollViewer Name="TimelineScroll" Grid.Row="1" Background="#FF202020" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled">
-            <Canvas Name="Timeline" Margin="0,2,0,0"/>
+            <Grid Name="Timeline"/>
         </ScrollViewer>
         <ScrollViewer Grid.Row="2">
             <Grid Name="Tracks"/>

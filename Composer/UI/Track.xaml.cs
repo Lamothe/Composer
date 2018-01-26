@@ -37,7 +37,7 @@ namespace Composer.UI
 
             DeleteButton.Click += (s, e) =>
             {
-                Bars.ForEach<UI.Bar>(x => x.Delete());
+                Bars.ForEach<Bar>(x => x.Delete());
                 DeleteTrack?.Invoke(this, EventArgs.Empty);
             };
             Scroll.ViewChanged += (s, e) => HorizontalPositionChanged?.Invoke(this, Scroll.HorizontalOffset);
@@ -49,16 +49,16 @@ namespace Composer.UI
         {
             foreach (var ui in Bars.Children)
             {
-                (ui as UI.Bar).Update();
+                (ui as Bar).Update();
             }
 
             TrackGrid.Background = IsRecording ? RecordingTrackBrush : TrackBrush;
             Info.Text = $"{Model.Name}";
         }
 
-        public UI.Bar AddBar(Model.Bar model)
+        public Bar AddBar(Model.Bar model)
         {
-            var ui = new UI.Bar
+            var ui = new Bar
             {
                 Model = model,
                 Width = BarWidth
@@ -86,25 +86,25 @@ namespace Composer.UI
             Scroll.ChangeView(horizontalOffset, 0, 1, true);
         }
 
-        public void SelectPrevious(UI.Bar current)
+        public void SelectPrevious(Bar current)
         {
             var index = Bars.Children.IndexOf(current);
             if (index - 1 >= 0)
             {
-                (Bars.Children[index - 1] as UI.Bar).Select(true);
+                (Bars.Children[index - 1] as Bar).Select(true);
             }
         }
 
-        public void SelectNext(UI.Bar current)
+        public void SelectNext(Bar current)
         {
             var index = Bars.Children.IndexOf(current);
             if (index + 1 < Bars.Children.Count())
             {
-                (Bars.Children[index + 1] as UI.Bar).Select(true);
+                (Bars.Children[index + 1] as Bar).Select(true);
             }
         }
 
-        public void ScrollToElement(UI.Bar bar)
+        public void ScrollToElement(Bar bar)
         {
             Scroll.ScrollToElement(bar, false);
         }

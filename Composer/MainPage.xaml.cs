@@ -48,7 +48,7 @@ namespace Composer
         private const int NumberOfBars = 100;
         private const int BarSize = 200;
         private const int InfoSize = 100;
-        private const int InfoMargin = 4; // 2L +  2R
+        private const int InfoMargin = 2;
         private const int BarMargin = 2;
 
         public event EventHandler AudioStatusChanged;
@@ -177,47 +177,6 @@ namespace Composer
             Load();
         }
 
-        private void DrawTimeline()
-        {
-            Timeline.Children.Clear();
-            var labelSize = 50;
-
-            Timeline.Height = 30;
-            Timeline.Width = NumberOfBars * BarSize;
-            var offset = InfoSize + InfoMargin / 2 + BarMargin / 2;
-
-            for (int i = 0; i < NumberOfBars; i++)
-            {
-                var x = i * BarSize + offset;
-                var line = new Line { X1 = x, Y1 = 20, X2 = x, Y2 = 30, Stroke = DefaultBrush };
-                Timeline.Children.Add(line);
-
-                var time = i * SecondsPerBar;
-                var timeLabel = new TextBlock
-                {
-                    Text = $"{time.ToTimeString()} s",
-                    Foreground = DefaultBrush,
-                    TextAlignment = TextAlignment.Center,
-                    Width = labelSize,
-                    FontSize = 10
-                };
-                Canvas.SetLeft(timeLabel, i * BarSize - labelSize / 2 + offset);
-                Timeline.Children.Add(timeLabel);
-
-                var barLabel = new TextBlock
-                {
-                    Text = i < 0 ? "-" : $"Bar {i + 1}",
-                    Foreground = DefaultBrush,
-                    TextAlignment = TextAlignment.Center,
-                    Width = labelSize,
-                    FontSize = 10
-                };
-                Canvas.SetTop(barLabel, 10);
-                Canvas.SetLeft(barLabel, i * BarSize + BarSize / 2 - labelSize / 2 + offset);
-                Timeline.Children.Add(barLabel);
-            }
-        }
-
         private async void Load()
         {
             try
@@ -232,7 +191,30 @@ namespace Composer
 
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
                 SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
-                DrawTimeline();
+
+                var grid = new Grid { Margin = new Thickness(2) };
+                Timeline.Children.Add(grid);
+                var label = new Button
+                {
+                    Content = " ",
+                    Width = BarSize,
+                    Margin = new Thickness(InfoMargin)
+                };
+                grid.Children.Add(label);
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                for (int i = 0; i < NumberOfBars; i++)
+                {
+                    var button = new Button
+                    {
+                        Content = $"Bar {i + 1}",
+                        Width = BarSize,
+                        Margin = new Thickness(BarMargin)
+                    };
+
+                    grid.Children.Add(button);
+                    Grid.SetColumn(button, i + 1);
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarSize) });
+                }
 
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
@@ -335,7 +317,7 @@ namespace Composer
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            Play();
+            TogglePlay();
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
@@ -408,6 +390,7 @@ namespace Composer
                 if (Song.Tracks.Any())
                 {
                     PlaybackAudio.Play(Song);
+                    SetAudioStatus(Model.Status.Playing);
                 }
             }
         }
