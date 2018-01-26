@@ -296,18 +296,38 @@ namespace Composer.Model
             Start();
         }
 
-        public static async void SaveTrack(Track track, StorageFile file)
+        public static async void Save(Song song, StorageFolder folder)
         {
-            var lastBar = track.GetLastNonEmptyBarIndex();
-            using (var stream = await file.OpenStreamForWriteAsync())
+            for (int trackIndex = 0; trackIndex <= song.Tracks.Count(); trackIndex++)
             {
-                for (int barIndex = 0; barIndex <= lastBar; barIndex++)
+                var track = song.Tracks[trackIndex];
+                var lastBarIndex = track.GetLastNonEmptyBarIndex();
+                for (int barIndex = 0; barIndex <= lastBarIndex; barIndex++)
                 {
-                    var bar = track.Bars[lastBar];
-                    var buffer = bar.Buffer == null ? new byte[bar.SamplesPerBar] : bar.Buffer.SelectMany(BitConverter.GetBytes).ToArray();
-                    stream.Write(buffer, 0, bar.SamplesPerBar);
+                    var fileName = $"bar-{trackIndex}-{barIndex}.pcm";
+                    var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+
+                    using (var stream = await file.OpenStreamForWriteAsync())
+                    {
+                        var bar = track.Bars[lastBarIndex];
+                        if (bar.Buffer != null)
+                        {
+                            var buffer = bar.Buffer.SelectMany(BitConverter.GetBytes).ToArray();
+                            stream.Write(buffer, 0, bar.SamplesPerBar);
+                            stream.Close();
+                        }
+                    }
                 }
-                stream.Close();
+            }
+        }
+
+        public static async void Load(StorageFolder folder, Song song)
+        {
+            var trackIndex = 0;
+            var files = await folder.GetFilesAsync();
+
+            if (files.Any(x => x.Name.StartsWith($"bar-{trackIndex}-")))
+            {
             }
         }
 

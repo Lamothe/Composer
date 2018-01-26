@@ -452,14 +452,7 @@ namespace Composer
             StoragePath = folder.Name;
 
             Status.Text = "Saving ...";
-            var trackIndex = 0;
-            foreach (var track in Song.Tracks)
-            {
-                var lastBarIndex = track.GetLastNonEmptyBarIndex() + 1;
-                var fileName = $"track{++trackIndex}.pcm";
-                var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
-                Audio.SaveTrack(track, file);
-            }
+            Audio.Save(Song, folder);
             Status.Text = $"Saved to {StoragePath}";
         }
     }
