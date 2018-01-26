@@ -10,7 +10,7 @@
     <Grid Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="100" />
-            <RowDefinition Height="30" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -22,7 +22,7 @@
             <Button Name="SaveButton" Content="Save" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="SaveButton_Click" />
         </StackPanel>
         <ScrollViewer Name="TimelineScroll" Grid.Row="1" Background="#FF202020" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled">
-            <Grid Name="Timeline"/>
+            <Grid Name="Timeline" Margin="2,2,2,2"/>
         </ScrollViewer>
         <ScrollViewer Grid.Row="2">
             <Grid Name="Tracks"/>

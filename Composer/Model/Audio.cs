@@ -276,7 +276,17 @@ namespace Composer.Model
                 input.AddOutgoingConnection(output);
                 void quantumStarted(AudioFrameInputNode sender, FrameInputNodeQuantumStartedEventArgs e)
                 {
+                    if (song.BeginLoop.HasValue && song.EndLoop.HasValue)
+                    {
+                        var barIndex = track.GetBarIndexAtPosition(position);
+                        if (barIndex > song.EndLoop)
+                        {
+                            position = song.BeginLoop.Value * track.SamplesPerBar;
+                        }
+                    }
+
                     var samples = track.Read(position, e.RequiredSamples);
+
                     using (var frame = GenerateFrameFromSamples(samples))
                     {
                         input.AddFrame(frame);

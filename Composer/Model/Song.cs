@@ -11,6 +11,8 @@ namespace Composer.Model
         public int BeatsPerMinute { get; set; } = 120;
         public int BeatsPerBar { get; set; } = 4;
         public List<Track> Tracks { get; set; } = new List<Track>();
+        public int? BeginLoop { get; set; }
+        public int? EndLoop { get; set; }
 
         public void AddTrack(Model.Track track)
         {

@@ -18,7 +18,7 @@ namespace Composer.Model
         public int SamplesPerBar { get; set; }
         public bool IsMuted { get; set; }
 
-        public Bar GetBarAtPosition(int position)
+        public int? GetBarIndexAtPosition(int position)
         {
             var barIndex = position / SamplesPerBar;
 
@@ -27,7 +27,13 @@ namespace Composer.Model
                 return null;
             }
 
-            return Bars[barIndex];
+            return barIndex;
+        }
+
+        public Bar GetBarAtPosition(int position)
+        {
+            var barIndex = GetBarIndexAtPosition(position);
+            return !barIndex.HasValue ? null : Bars[barIndex.Value];
         }
 
         public int GetLastNonEmptyBarIndex()

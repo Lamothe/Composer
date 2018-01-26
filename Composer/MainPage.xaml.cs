@@ -45,7 +45,7 @@ namespace Composer
         private Audio PlaybackAudio { get; set; }
         private object PositionLocker = new object();
         private SolidColorBrush DefaultBrush = new SolidColorBrush(Colors.WhiteSmoke);
-        private const int NumberOfBars = 100;
+        private const int NumberOfBars = 20;
         private const int BarSize = 200;
         private const int InfoSize = 100;
         private const int InfoMargin = 2;
@@ -192,28 +192,59 @@ namespace Composer
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
                 SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
 
-                var grid = new Grid { Margin = new Thickness(2) };
-                Timeline.Children.Add(grid);
-                var label = new Button
+                var dummyInfoButton = new Button
                 {
                     Content = " ",
                     Width = BarSize,
                     Margin = new Thickness(InfoMargin)
                 };
-                grid.Children.Add(label);
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                Timeline.Children.Add(dummyInfoButton);
+                Timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+
+                var loopButtonSize = 30;
                 for (int i = 0; i < NumberOfBars; i++)
                 {
-                    var button = new Button
+                    var barGrid = new Grid();
+
+                    var left = new Button { Content = "<", Tag = i };
+                    var button = new Button { Content = $"Bar {i + 1}", Width = BarSize - loopButtonSize * 2 - BarMargin * 2 };
+                    var right = new Button { Content = ">", Tag = i };
+
+                    left.Click += (s, e) =>
                     {
-                        Content = $"Bar {i + 1}",
-                        Width = BarSize,
-                        Margin = new Thickness(BarMargin)
+                        var index = (int)left.Tag;
+                        if (index <= Song.BeginLoop)
+                        {
+                            Song.BeginLoop = index;
+                            Updated = true;
+                        }
                     };
 
-                    grid.Children.Add(button);
-                    Grid.SetColumn(button, i + 1);
-                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarSize) });
+                    right.Click += (s, e) =>
+                    {
+                        var index = (int)right.Tag;
+                        if (index >= Song.BeginLoop)
+                        {
+                            Song.EndLoop = index;
+                            Updated = true;
+                        }
+                    };
+
+                    barGrid.Children.Add(left);
+                    barGrid.Children.Add(button);
+                    barGrid.Children.Add(right);
+
+                    Grid.SetColumn(left, 0);
+                    Grid.SetColumn(button, 1);
+                    Grid.SetColumn(right, 2);
+
+                    barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(loopButtonSize) });
+                    barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(loopButtonSize) });
+
+                    Timeline.Children.Add(barGrid);
+                    Grid.SetColumn(barGrid, i + 1);
+                    Timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarSize) });
                 }
 
                 PlayButton.IsEnabled = true;
@@ -235,7 +266,12 @@ namespace Composer
             var bars = Position / (decimal)SamplesPerBar;
             var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
             var seconds = (decimal)(bars * secondsPerBar);
-            Status.Text = $"{AudioStatus.ToString()}: {seconds.ToTimeString()} s";
+            var text = $"{AudioStatus.ToString()}: {seconds.ToTimeString()} s";
+            if (Song.BeginLoop.HasValue && Song.EndLoop.HasValue)
+            {
+                text += $" [Looping: {Song.BeginLoop.Value}-{Song.EndLoop.Value}]";
+            }
+            Status.Text = text;
         }
 
         private string GenerateTrackName()
