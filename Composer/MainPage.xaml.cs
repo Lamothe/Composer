@@ -250,6 +250,13 @@ namespace Composer
                 {
                     ComboBpm.Items.Add(bpm);
                 }
+                ComboBpm.SelectedItem = Song.BeatsPerMinute;
+
+                for (var bpb = 2; bpb < 10; bpb++)
+                {
+                    ComboBpm.Items.Add(bpb);
+                }
+                ComboBeatsPerBar.SelectedItem = Song.BeatsPerBar;
 
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
@@ -500,6 +507,20 @@ namespace Composer
             {
                 ComboBpm.SelectedItem = Song.BeatsPerMinute;
                 Status.Text = "Can't set BPM on a song with tracks.";
+            }
+        }
+
+        private void ComboBeatsPerBar_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var value = (int)ComboBeatsPerBar.SelectedValue;
+            if (!Song.Tracks.Any())
+            {
+                Song.BeatsPerMinute = value;
+            }
+            else
+            {
+                ComboBeatsPerBar.SelectedItem = Song.BeatsPerBar;
+                Status.Text = "Can't set beats per bar on a song with tracks.";
             }
         }
     }

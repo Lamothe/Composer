@@ -29,6 +29,14 @@
                 <TextBlock Text="BPM" VerticalAlignment="Center" Grid.Column="0" Margin="5" />
                 <ComboBox Name="ComboBpm" VerticalAlignment="Center" IsEnabled="False" Grid.Column="1" SelectionChanged="ComboBpm_SelectionChanged" />
             </Grid>
+            <Grid VerticalAlignment="Stretch" Background="#FF333333">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Beats/Bar" VerticalAlignment="Center" Grid.Column="0" Margin="5" />
+                <ComboBox Name="ComboBeatsPerBar" VerticalAlignment="Center" IsEnabled="False" Grid.Column="1" SelectionChanged="ComboBeatsPerBar_SelectionChanged" />
+            </Grid>
         </StackPanel>
         <ScrollViewer Name="TimelineScroll" Grid.Row="1" Background="#FF202020" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled">
             <Grid Name="Timeline" Margin="2,2,2,2"/>

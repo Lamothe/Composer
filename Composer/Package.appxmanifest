@@ -4,7 +4,7 @@
   <mp:PhoneIdentity PhoneProductId="12d065fc-b20f-440f-a61f-67f32f18a7be" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>Composer</DisplayName>
-    <PublisherDisplayName>micha</PublisherDisplayName>
+    <PublisherDisplayName>Michael Lamothe</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
@@ -15,7 +15,7 @@
   </Resources>
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="Composer.App">
-      <uap:VisualElements DisplayName="Composer" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" Description="Composer" BackgroundColor="transparent">
+      <uap:VisualElements DisplayName="Composer" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" Description="A simple open source, multi-track audio recorder designed for creating backing tracks and loops for practise." BackgroundColor="transparent">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square310x310Logo="Assets\LargeTile.png" Square71x71Logo="Assets\SmallTile.png">
         </uap:DefaultTile>
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
