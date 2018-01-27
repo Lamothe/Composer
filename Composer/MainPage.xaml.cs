@@ -173,10 +173,10 @@ namespace Composer
             AudioStatusChanged += (s, e) => Updated = true;
             PositionChanged += (s, e) => Updated = true;
 
-            Load();
+            Init();
         }
 
-        private async void Load()
+        private async void Init()
         {
             try
             {
@@ -246,11 +246,17 @@ namespace Composer
                     Timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarSize) });
                 }
 
+                for (var bpm = 50; bpm < 300; bpm++)
+                {
+                    ComboBpm.Items.Add(bpm);
+                }
+
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
                 StopButton.IsEnabled = true;
                 MetronomeButton.IsEnabled = true;
                 SaveButton.IsEnabled = true;
+                ComboBpm.IsEnabled = true;
 
                 Status.Text = "Ready";
             }
@@ -375,6 +381,11 @@ namespace Composer
             Save();
         }
 
+        private void LoadButton_Click(object sender, RoutedEventArgs e)
+        {
+            Load();
+        }
+
         private void ToggleRecord()
         {
             if (AudioStatus == Model.Status.Stopped)
@@ -472,6 +483,24 @@ namespace Composer
             Status.Text = "Saving ...";
             Audio.Save(Song, folder);
             Status.Text = $"Saved to {StoragePath}";
+        }
+
+        private void Load()
+        {
+        }
+
+        private void ComboBpm_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var value = (int)ComboBpm.SelectedValue;
+            if (!Song.Tracks.Any())
+            {
+                Song.BeatsPerMinute = value;
+            }
+            else
+            {
+                ComboBpm.SelectedItem = Song.BeatsPerMinute;
+                Status.Text = "Can't set BPM on a song with tracks.";
+            }
         }
     }
 }

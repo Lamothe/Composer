@@ -20,6 +20,15 @@
             <Button Name="StopButton" Content="Stop" Click="StopButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="SaveButton" Content="Save" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="SaveButton_Click" />
+            <Button Name="LoadButton" Content="Load" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="LoadButton_Click" />
+            <Grid VerticalAlignment="Stretch" Background="#FF333333">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="BPM" VerticalAlignment="Center" Grid.Column="0" Margin="5" />
+                <ComboBox Name="ComboBpm" VerticalAlignment="Center" IsEnabled="False" Grid.Column="1" SelectionChanged="ComboBpm_SelectionChanged" />
+            </Grid>
         </StackPanel>
         <ScrollViewer Name="TimelineScroll" Grid.Row="1" Background="#FF202020" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled">
             <Grid Name="Timeline" Margin="2,2,2,2"/>
