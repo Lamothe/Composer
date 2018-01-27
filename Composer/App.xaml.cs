@@ -7,6 +7,7 @@ using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.UI.Popups;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -30,6 +31,21 @@ namespace Composer
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
+            this.UnhandledException += App_UnhandledException;
+        }
+
+        private async void App_UnhandledException(object sender, Windows.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            var message = e.Message;
+
+            var fnfe = e.Exception as FileNotFoundException;
+            if (fnfe != null)
+            {
+                message += $": {fnfe.FileName}";
+            }
+
+            var dialog = new MessageDialog(message);
+            await dialog.ShowAsync();
         }
 
         /// <summary>

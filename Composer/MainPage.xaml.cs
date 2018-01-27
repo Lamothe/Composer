@@ -254,7 +254,7 @@ namespace Composer
 
                 for (var bpb = 2; bpb < 10; bpb++)
                 {
-                    ComboBpm.Items.Add(bpb);
+                    ComboBeatsPerBar.Items.Add(bpb);
                 }
                 ComboBeatsPerBar.SelectedItem = Song.BeatsPerBar;
 
@@ -264,6 +264,7 @@ namespace Composer
                 MetronomeButton.IsEnabled = true;
                 SaveButton.IsEnabled = true;
                 ComboBpm.IsEnabled = true;
+                ComboBeatsPerBar.IsEnabled = true;
 
                 Status.Text = "Ready";
             }
