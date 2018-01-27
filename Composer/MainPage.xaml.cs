@@ -39,7 +39,6 @@ namespace Composer
         private double Zoom { get; set; } = 0;
         public Status AudioStatus { get; set; }
         public int Position { get; set; }
-        public int SamplesPerBar { get; set; }
         public decimal SecondsPerBar { get; set; }
         private Audio RecordingAudio { get; set; }
         private Audio PlaybackAudio { get; set; }
@@ -93,7 +92,7 @@ namespace Composer
                 {
                     if (SelectedBar.Model.Buffer == null)
                     {
-                        SelectedBar.Model.Buffer = new float[SamplesPerBar];
+                        SelectedBar.Model.Buffer = new float[Song.SamplesPerBar];
                     }
 
                     var content = Clipboard.GetContent();
@@ -190,7 +189,7 @@ namespace Composer
                 RecordingAudio.Completed += (s, e) => CallUI(() => Stop());
 
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
-                SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
+                Song.SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
 
                 var dummyInfoButton = new Button
                 {
@@ -213,7 +212,7 @@ namespace Composer
                     left.Click += (s, e) =>
                     {
                         var index = (int)left.Tag;
-                        if (index <= Song.BeginLoop)
+                        if (!Song.EndLoop.HasValue || index <= Song.EndLoop.Value)
                         {
                             Song.BeginLoop = index;
                             Updated = true;
@@ -223,7 +222,7 @@ namespace Composer
                     right.Click += (s, e) =>
                     {
                         var index = (int)right.Tag;
-                        if (index >= Song.BeginLoop)
+                        if (!Song.BeginLoop.HasValue || index >= Song.BeginLoop.Value)
                         {
                             Song.EndLoop = index;
                             Updated = true;
@@ -263,13 +262,13 @@ namespace Composer
 
         private void UpdateStatus()
         {
-            var bars = Position / (decimal)SamplesPerBar;
+            var bars = Position / (decimal)Song.SamplesPerBar;
             var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
             var seconds = (decimal)(bars * secondsPerBar);
             var text = $"{AudioStatus.ToString()}: {seconds.ToTimeString()} s";
             if (Song.BeginLoop.HasValue && Song.EndLoop.HasValue)
             {
-                text += $" [Looping: {Song.BeginLoop.Value}-{Song.EndLoop.Value}]";
+                text += $" [Looping Bars: {Song.BeginLoop.Value + 1}-{Song.EndLoop.Value + 1}]";
             }
             Status.Text = text;
         }
@@ -302,7 +301,7 @@ namespace Composer
             var model = new Track
             {
                 Name = GenerateTrackName(),
-                SamplesPerBar = SamplesPerBar
+                Song = Song
             };
             Song.AddTrack(model);
 
@@ -327,7 +326,7 @@ namespace Composer
 
             for (int count = 0; count < NumberOfBars; count++)
             {
-                var barModel = new Bar { SamplesPerBar = SamplesPerBar };
+                var barModel = new Bar { Track = model };
                 model.Bars.Add(barModel);
 
                 barModel.Update += (s1, e) => Updated = true;

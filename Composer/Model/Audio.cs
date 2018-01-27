@@ -249,10 +249,20 @@ namespace Composer.Model
 
             void quantumProcessed(AudioGraph sender, object o)
             {
-                position = (int)Graph.CompletedQuantumCount * Graph.SamplesPerQuantum;
+                position += Graph.SamplesPerQuantum;
+
+                if (song.BeginLoop.HasValue && song.EndLoop.HasValue)
+                {
+                    var barIndex = position / song.SamplesPerBar;
+                    if (barIndex > song.EndLoop)
+                    {
+                        position = song.BeginLoop.Value * song.SamplesPerBar;
+                    }
+                }
+
                 PositionUpdated?.Invoke(this, position);
 
-                if (position / song.Tracks.First().SamplesPerBar >= lastBarIndex)
+                if (position / song.Tracks.First().Song.SamplesPerBar >= lastBarIndex)
                 {
                     Stop();
                     Completed?.Invoke(this, EventArgs.Empty);
@@ -276,15 +286,6 @@ namespace Composer.Model
                 input.AddOutgoingConnection(output);
                 void quantumStarted(AudioFrameInputNode sender, FrameInputNodeQuantumStartedEventArgs e)
                 {
-                    if (song.BeginLoop.HasValue && song.EndLoop.HasValue)
-                    {
-                        var barIndex = track.GetBarIndexAtPosition(position);
-                        if (barIndex > song.EndLoop)
-                        {
-                            position = song.BeginLoop.Value * track.SamplesPerBar;
-                        }
-                    }
-
                     var samples = track.Read(position, e.RequiredSamples);
 
                     using (var frame = GenerateFrameFromSamples(samples))
@@ -323,7 +324,7 @@ namespace Composer.Model
                         if (bar.Buffer != null)
                         {
                             var buffer = bar.Buffer.SelectMany(BitConverter.GetBytes).ToArray();
-                            stream.Write(buffer, 0, bar.SamplesPerBar);
+                            stream.Write(buffer, 0, bar.Track.Song.SamplesPerBar);
                             stream.Close();
                         }
                     }
@@ -343,7 +344,7 @@ namespace Composer.Model
 
         public async void SaveTrackProper(Track track, StorageFile file)
         {
-            var trackLengthInSamples = track.SamplesPerBar * track.GetLastNonEmptyBarIndex();
+            var trackLengthInSamples = track.Song.SamplesPerBar * track.GetLastNonEmptyBarIndex();
             var samplesRead = 0;
 
             var fileProfile = Audio.CreateMediaEncodingProfile(file);

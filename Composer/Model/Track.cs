@@ -13,14 +13,14 @@ namespace Composer.Model
 {
     public class Track
     {
+        public Song Song { get; set; }
         public string Name { get; set; }
         public List<Bar> Bars { get; set; } = new List<Bar>();
-        public int SamplesPerBar { get; set; }
         public bool IsMuted { get; set; }
 
         public int? GetBarIndexAtPosition(int position)
         {
-            var barIndex = position / SamplesPerBar;
+            var barIndex = position / Song.SamplesPerBar;
 
             if (barIndex >= Bars.Count())
             {
@@ -54,7 +54,7 @@ namespace Composer.Model
 
         public float[] Read(int position, int numberOfSamples)
         {
-            var totalBufferLength = Bars.Count() * SamplesPerBar;
+            var totalBufferLength = Bars.Count() * Song.SamplesPerBar;
             var bar = GetBarAtPosition(position);
 
             if (bar == null)
@@ -67,7 +67,7 @@ namespace Composer.Model
                 return new float[numberOfSamples];
             }
 
-            var offset = position % SamplesPerBar;
+            var offset = position % Song.SamplesPerBar;
 
             var length = Math.Min(numberOfSamples, bar.Buffer.Length - offset);
 
@@ -85,8 +85,8 @@ namespace Composer.Model
                 return false;
             }
 
-            var offset = position % SamplesPerBar;
-            var remainingSpaceInBuffer = SamplesPerBar - offset;
+            var offset = position % Song.SamplesPerBar;
+            var remainingSpaceInBuffer = Song.SamplesPerBar - offset;
             var length = Math.Min(samples.Length, remainingSpaceInBuffer);
 
             bar.Write(samples, 0, offset, length);

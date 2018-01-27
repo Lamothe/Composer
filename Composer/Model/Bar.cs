@@ -13,7 +13,7 @@ namespace Composer.Model
         public event EventHandler Update;
 
         public float[] Buffer { get; set; }
-        public int SamplesPerBar { get; set; }
+        public Track Track { get; set; }
 
         public void SetEmpty()
         {
@@ -25,7 +25,7 @@ namespace Composer.Model
         {
             if (Buffer == null)
             {
-                Buffer = new float[SamplesPerBar];
+                Buffer = new float[Track.Song.SamplesPerBar];
             }
 
             Array.Copy(buffer, sourceOffset, Buffer, destinationOffset, length);
