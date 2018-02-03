@@ -34,8 +34,6 @@ namespace Composer.Model
     {
         public AudioGraph Graph { get; private set; }
         public DeviceInformationCollection OutputDevices { get; private set; }
-        public AudioDeviceInputNode DeviceInputNode { get; private set; }
-        public AudioDeviceOutputNode DeviceOutputNode { get; private set; }
         private const int ElementSize = sizeof(float);
         public event EventHandler Stopped;
         public event EventHandler<int> PositionUpdated;
@@ -51,7 +49,7 @@ namespace Composer.Model
         {
             var audio = new Audio
             {
-                OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector())
+                OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector()),                
             };
 
             var settings = new AudioGraphSettings(AudioRenderCategory.Media)
@@ -201,13 +199,13 @@ namespace Composer.Model
         public async void Record(Track track)
         {
             var input = await CreateInputDevice();
-            var output = CreateFrameOutputNode();
-            input.AddOutgoingConnection(output);
+            var frameOutputNode = CreateFrameOutputNode();
+            input.AddOutgoingConnection(frameOutputNode);
 
             var position = 0;
             void quantumStarted(AudioGraph s, object e)
             {
-                var samples = ReadSamplesFromFrame(output);
+                var samples = ReadSamplesFromFrame(frameOutputNode);
                 if (samples != null)
                 {
                     if (!track.Write(samples, position))
@@ -225,7 +223,7 @@ namespace Composer.Model
             void stopped(object sender, EventArgs e)
             {
                 input.Dispose();
-                output.Dispose();
+                frameOutputNode.Dispose();
                 Graph.QuantumStarted -= quantumStarted;
                 Stopped -= stopped;
             };

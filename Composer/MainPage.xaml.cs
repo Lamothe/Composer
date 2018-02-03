@@ -31,7 +31,6 @@ namespace Composer
     {
         private string StoragePath = null;
         private Model.Song Song { get; set; }
-        private Model.Metronome Metronome { get; set; }
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
         private bool ScrollUpdating { get; set; } = false;
@@ -42,6 +41,8 @@ namespace Composer
         public decimal SecondsPerBar { get; set; }
         private Audio RecordingAudio { get; set; }
         private Audio PlaybackAudio { get; set; }
+        private Audio MetronomeAudio { get; set; }
+        private Metronome Metronome { get; set; } = new Metronome();
         private object PositionLocker = new object();
         private SolidColorBrush DefaultBrush = new SolidColorBrush(Colors.WhiteSmoke);
         private const int NumberOfBars = 20;
@@ -187,6 +188,9 @@ namespace Composer
                 RecordingAudio = await Audio.Create();
                 RecordingAudio.PositionUpdated += (s, position) => SetPosition(position);
                 RecordingAudio.Completed += (s, e) => CallUI(() => Stop());
+
+                MetronomeAudio = await Audio.Create();
+                Metronome.Info += (s, m) => CallUI(() => Status.Text = m);
 
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
                 Song.SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
@@ -376,12 +380,12 @@ namespace Composer
 
         private void MetronomeButton_Checked(object sender, RoutedEventArgs e)
         {
-            Metronome.Play();
+            Metronome.Play(MetronomeAudio, Song.BeatsPerMinute);
         }
 
         private void MetronomeButton_Unchecked(object sender, RoutedEventArgs e)
         {
-            Metronome.Stop();
+            MetronomeAudio.Stop();
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -456,6 +460,7 @@ namespace Composer
                 Tracks.ForEach<UI.Track>(x => x.IsRecording = false);
                 RecordingAudio.Stop();
                 PlaybackAudio.Stop();
+                MetronomeAudio.Stop();
 
                 SetAudioStatus(Model.Status.Stopped);
             }
@@ -516,7 +521,7 @@ namespace Composer
             var value = (int)ComboBeatsPerBar.SelectedValue;
             if (!Song.Tracks.Any())
             {
-                Song.BeatsPerMinute = value;
+                Song.BeatsPerBar = value;
             }
             else
             {

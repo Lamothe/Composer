@@ -8,7 +8,7 @@ namespace Composer.Model
 {
     public class Song
     {
-        public int BeatsPerMinute { get; set; } = 120;
+        public int BeatsPerMinute { get; set; } = 90;
         public int BeatsPerBar { get; set; } = 4;
         public int SamplesPerBar { get; set; }
         public List<Track> Tracks { get; set; } = new List<Track>();
