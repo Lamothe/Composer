@@ -44,7 +44,7 @@ namespace Composer.Model
                     var dataInFloat = (float*)dataInBytes;
 
                     var beatsPerSeconds = BeatsPerMinute / 60.0;
-                    var offset = timeInSeconds % beatsPerSeconds;
+                    var offset = timeInSeconds % (1 / beatsPerSeconds);
 
                     if (offset < Duration)
                     {
@@ -98,6 +98,7 @@ namespace Composer.Model
 
                 frameInputNode.AddOutgoingConnection(OutputDevice);
             }
+
             graph.Start();
         }
     }
