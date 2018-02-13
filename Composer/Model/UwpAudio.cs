@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Composer.Core.Model;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading;
@@ -22,32 +22,34 @@ using Windows.Storage.Streams;
 
 namespace Composer.Model
 {
-    [ComImport]
-    [Guid("5B0D3235-4DBA-4D44-865E-8F1D0E4FD04D")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    public unsafe interface IMemoryBufferByteAccess
+    public class UwpAudio : IAudio, IDisposable
     {
-        void GetBuffer(out byte* buffer, out uint capacity);
-    }
+        private const int ElementSize = sizeof(float);
+        public int SampleRate { get { return 44100; } }
+        private const int MetronomeFrequency = 440;
+        private const float MetronomeAmplitude = 0.3f;
+        private const float MetronomeDuration = 0.1f;
 
-    public class Audio : IDisposable
-    {
         public AudioGraph Graph { get; private set; }
         public DeviceInformationCollection OutputDevices { get; private set; }
-        private const int ElementSize = sizeof(float);
+        private int TotalSampleCount { get; set; }
+        private int BeatsPerMinute { get; set; }
+        private AudioDeviceOutputNode OutputDevice { get; set; }
+        private AudioDeviceInputNode InputDevice { get; set; }
+
         public event EventHandler Stopped;
         public event EventHandler<int> PositionUpdated;
         public event EventHandler Completed;
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
-        private Audio()
+        private UwpAudio()
         {
         }
 
-        public static async Task<Audio> Create()
+        public static async Task<UwpAudio> Create()
         {
-            var audio = new Audio
+            var audio = new UwpAudio
             {
                 OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector()),                
             };
@@ -63,6 +65,11 @@ namespace Composer.Model
                 throw new ApplicationException($"Audio graph error: {audioGraphResult.Status}");
             }
             audio.Graph = audioGraphResult.Graph;
+
+            audio.InputDevice = await audio.CreateInputDevice();
+            audio.OutputDevice = await audio.CreateOutputDevice();
+            audio.InputDevice.AddOutgoingConnection(audio.OutputDevice);
+            audio.Graph.Start();
 
             return audio;
         }
@@ -125,8 +132,6 @@ namespace Composer.Model
 
         public void Stop()
         {
-            Graph.Stop();
-            Graph.ResetAllNodes();
             Stopped?.Invoke(this, EventArgs.Empty);
         }
 
@@ -135,7 +140,7 @@ namespace Composer.Model
             Graph.ResetAllNodes();
         }
 
-        public static unsafe float[] ReadSamplesFromFrame(AudioFrameOutputNode frameOutputNode)
+        private static unsafe float[] ReadSamplesFromFrame(AudioFrameOutputNode frameOutputNode)
         {
             using (var frame = frameOutputNode.GetFrame())
             {
@@ -165,7 +170,7 @@ namespace Composer.Model
             }
         }
 
-        public static unsafe AudioFrame GenerateFrameFromSamples(float[] samples)
+        private static unsafe AudioFrame GenerateFrameFromSamples(float[] samples)
         {
             var bufferSizeInBytes = samples.Length * ElementSize;
 
@@ -196,33 +201,33 @@ namespace Composer.Model
             }
         }
 
-        public async void Record(Track track)
+        public void Record(Track track)
         {
-            var input = await CreateInputDevice();
-            var frameOutputNode = CreateFrameOutputNode();
-            input.AddOutgoingConnection(frameOutputNode);
+            BeatsPerMinute = track.Song.BeatsPerMinute;
+            TotalSampleCount = 0;
 
-            var position = 0;
+            var frameOutputNode = CreateFrameOutputNode();
+            InputDevice.AddOutgoingConnection(frameOutputNode);
+
             void quantumStarted(AudioGraph s, object e)
             {
                 var samples = ReadSamplesFromFrame(frameOutputNode);
                 if (samples != null)
                 {
-                    if (!track.Write(samples, position))
+                    if (!track.Write(samples, samples.Length))
                     {
+                        // TODO: This Stop() call has thrown with a "can't call this from this thread" type message
+                        // i.e. Can't stop the graph from this thread.
                         Stop();
                         Completed?.Invoke(this, EventArgs.Empty);
                     }
 
-                    position += samples.Length;
-
-                    PositionUpdated?.Invoke(this, position);
+                    PositionUpdated?.Invoke(this, track.WritePosition);
                 }
             }
 
             void stopped(object sender, EventArgs e)
             {
-                input.Dispose();
                 frameOutputNode.Dispose();
                 Graph.QuantumStarted -= quantumStarted;
                 Stopped -= stopped;
@@ -230,8 +235,6 @@ namespace Composer.Model
 
             Stopped += stopped;
             Graph.QuantumStarted += quantumStarted;
-
-            Start();
         }
 
         public async void Play(Song song)
@@ -242,7 +245,7 @@ namespace Composer.Model
             }
 
             var position = 0;
-            var output = await CreateOutputDevice();
+            OutputDevice = await CreateOutputDevice();
             var lastBarIndex = song.GetLastNonEmptyBarIndex() + 1;
 
             void quantumProcessed(AudioGraph sender, object o)
@@ -272,7 +275,6 @@ namespace Composer.Model
             void stopped(object sender, EventArgs e)
             {
                 Graph.QuantumProcessed -= quantumProcessed;
-                output.Dispose();
                 Stopped -= stopped;
             };
 
@@ -281,7 +283,7 @@ namespace Composer.Model
             foreach (var track in song.Tracks)
             {
                 var input = CreateFrameInputNode();
-                input.AddOutgoingConnection(output);
+                input.AddOutgoingConnection(OutputDevice);
                 void quantumStarted(AudioFrameInputNode sender, FrameInputNodeQuantumStartedEventArgs e)
                 {
                     var samples = track.Read(position, e.RequiredSamples);
@@ -301,8 +303,6 @@ namespace Composer.Model
                 Stopped += inputStopped;
                 input.Start();
             }
-
-            Start();
         }
 
         public static async void Save(Song song, StorageFolder folder)
@@ -345,7 +345,7 @@ namespace Composer.Model
             var trackLengthInSamples = track.Song.SamplesPerBar * track.GetLastNonEmptyBarIndex();
             var samplesRead = 0;
 
-            var fileProfile = Audio.CreateMediaEncodingProfile(file);
+            var fileProfile = CreateMediaEncodingProfile(file);
             var fileOutputNodeResult = await Graph.CreateFileOutputNodeAsync(file, fileProfile);
             if (fileOutputNodeResult.Status != AudioFileNodeCreationStatus.Success)
             {
@@ -359,7 +359,7 @@ namespace Composer.Model
             {
                 var samples = track.Read(samplesRead, e.RequiredSamples);
                 samplesRead += samples.Length;
-                using (var frame = Audio.GenerateFrameFromSamples(samples))
+                using (var frame = GenerateFrameFromSamples(samples))
                 {
                     input.AddFrame(frame);
                 }
@@ -380,7 +380,6 @@ namespace Composer.Model
             Graph.QuantumProcessed += quantumProcessed;
 
             input.Start();
-            Start();
         }
     }
 }

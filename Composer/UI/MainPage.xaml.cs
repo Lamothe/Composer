@@ -30,19 +30,16 @@ namespace Composer
     public sealed partial class MainPage : Page
     {
         private string StoragePath = null;
-        private Model.Song Song { get; set; }
+        private Core.Model.Song Song { get; set; }
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
         private bool ScrollUpdating { get; set; } = false;
         private UI.Bar SelectedBar { get; set; } = null;
         private double Zoom { get; set; } = 0;
-        public Status AudioStatus { get; set; }
-        public int Position { get; set; }
+        public Core.Model.Status AudioStatus { get; set; }
         public decimal SecondsPerBar { get; set; }
-        private Audio RecordingAudio { get; set; }
-        private Audio PlaybackAudio { get; set; }
-        private Audio MetronomeAudio { get; set; }
-        private Metronome Metronome { get; set; } = new Metronome();
+        private UwpAudio Audio { get; set; }
+        private int CurrentPosition { get; set; }
         private object PositionLocker = new object();
         private SolidColorBrush DefaultBrush = new SolidColorBrush(Colors.WhiteSmoke);
         private const int NumberOfBars = 20;
@@ -51,9 +48,6 @@ namespace Composer
         private const int InfoMargin = 2;
         private const int BarMargin = 2;
 
-        public event EventHandler AudioStatusChanged;
-        public event EventHandler PositionChanged;
-
         private async void CallUI(DispatchedHandler f) =>
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, f);
 
@@ -61,13 +55,13 @@ namespace Composer
         {
             this.InitializeComponent();
 
-            Status.Text = "Initialising ...";
+            SetStatus("Initialising ...");
 
             RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
             PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
             StopButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S });
-            MetronomeButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.M });
             SaveButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S, Modifiers = Windows.System.VirtualKeyModifiers.Control });
+            LoadButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.O, Modifiers = Windows.System.VirtualKeyModifiers.Control });
 
             var copy = new KeyboardAccelerator { Key = Windows.System.VirtualKey.C, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             copy.Invoked += (s, e) =>
@@ -144,7 +138,7 @@ namespace Composer
             };
             KeyboardAccelerators.Add(save);
 
-            Song = new Song();
+            Song = new Core.Model.Song();
 
             Tracks.PointerWheelChanged += (s, e) =>
             {
@@ -164,36 +158,56 @@ namespace Composer
                     Updated = false;
                     CallUI(() =>
                     {
-                        UpdateStatus();
+                        UpdatePosition(CurrentPosition);
                         Tracks.ForEach<UI.Track>(x => x.Update());
                     });
                 }
             };
             timer.Start();
 
-            AudioStatusChanged += (s, e) => Updated = true;
-            PositionChanged += (s, e) => Updated = true;
-
             Init();
+        }
+
+        private void AddLog(string message)
+        {
+            CallUI(() => Log.Text += message + Environment.NewLine);
+        }
+
+        private void UpdatePosition(int position)
+        {
+            var bars = position / (decimal)Song.SamplesPerBar;
+            var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
+            var seconds = (decimal)(bars * secondsPerBar);
+            var text = $"{seconds.ToTimeString()} s";
+            if (Song.BeginLoop.HasValue && Song.EndLoop.HasValue)
+            {
+                text = $" [Loop: {Song.BeginLoop.Value + 1}-{Song.EndLoop.Value + 1}] " + text;
+            }
+            Position.Text = text;
+        }
+
+        private void SetPosition(int position)
+        {
+            CurrentPosition = position;
+            Updated = true;
+        }
+
+        private void SetStatus(string message)
+        {
+            Status.Text = message;
+            AddLog(message);
         }
 
         private async void Init()
         {
             try
             {
-                PlaybackAudio = await Audio.Create();
-                PlaybackAudio.PositionUpdated += (s, position) => SetPosition(position);
-                PlaybackAudio.Completed += (s, e) => CallUI(() => Stop());
-
-                RecordingAudio = await Audio.Create();
-                RecordingAudio.PositionUpdated += (s, position) => SetPosition(position);
-                RecordingAudio.Completed += (s, e) => CallUI(() => Stop());
-
-                MetronomeAudio = await Audio.Create();
-                Metronome.Info += (s, m) => CallUI(() => Status.Text = m);
+                Audio = await UwpAudio.Create();
+                Audio.PositionUpdated += (s, position) => SetPosition(position);
+                Audio.Completed += (s, e) => CallUI(() => Stop());
 
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
-                Song.SamplesPerBar = (int)(PlaybackAudio.SamplesPerSecond * SecondsPerBar) / 2;
+                Song.SamplesPerBar = (int)(Audio.SamplesPerSecond * SecondsPerBar) / 2;
 
                 var dummyInfoButton = new Button
                 {
@@ -265,30 +279,16 @@ namespace Composer
                 PlayButton.IsEnabled = true;
                 RecordButton.IsEnabled = true;
                 StopButton.IsEnabled = true;
-                MetronomeButton.IsEnabled = true;
                 SaveButton.IsEnabled = true;
                 ComboBpm.IsEnabled = true;
                 ComboBeatsPerBar.IsEnabled = true;
 
-                Status.Text = "Ready";
+               SetStatus("Ready");
             }
             catch (Exception ex)
             {
-                Status.Text = $"Exception: {ex.Message}";
+                SetStatus($"Exception: {ex.Message}");
             }
-        }
-
-        private void UpdateStatus()
-        {
-            var bars = Position / (decimal)Song.SamplesPerBar;
-            var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
-            var seconds = (decimal)(bars * secondsPerBar);
-            var text = $"{AudioStatus.ToString()}: {seconds.ToTimeString()} s";
-            if (Song.BeginLoop.HasValue && Song.EndLoop.HasValue)
-            {
-                text += $" [Looping Bars: {Song.BeginLoop.Value + 1}-{Song.EndLoop.Value + 1}]";
-            }
-            Status.Text = text;
         }
 
         private string GenerateTrackName()
@@ -316,13 +316,8 @@ namespace Composer
 
         private UI.Track AddTrack()
         {
-            var model = new Track
-            {
-                Name = GenerateTrackName(),
-                Song = Song
-            };
-            Song.AddTrack(model);
-
+            var model = Song.CreateTrack(GenerateTrackName());
+ 
             var ui = new UI.Track { Model = model };
 
             ui.DeleteTrack += (s, e) =>
@@ -344,7 +339,7 @@ namespace Composer
 
             for (int count = 0; count < NumberOfBars; count++)
             {
-                var barModel = new Bar { Track = model };
+                var barModel = new Core.Model.Bar(model);
                 model.Bars.Add(barModel);
 
                 barModel.Update += (s1, e) => Updated = true;
@@ -378,16 +373,6 @@ namespace Composer
             Stop();
         }
 
-        private void MetronomeButton_Checked(object sender, RoutedEventArgs e)
-        {
-            Metronome.Play(MetronomeAudio, Song.BeatsPerMinute);
-        }
-
-        private void MetronomeButton_Unchecked(object sender, RoutedEventArgs e)
-        {
-            MetronomeAudio.Stop();
-        }
-
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             Save();
@@ -400,7 +385,7 @@ namespace Composer
 
         private void ToggleRecord()
         {
-            if (AudioStatus == Model.Status.Stopped)
+            if (AudioStatus == Core.Model.Status.Stopped)
             {
                 Record();
             }
@@ -412,7 +397,7 @@ namespace Composer
 
         private void TogglePlay()
         {
-            if (AudioStatus == Model.Status.Stopped)
+            if (AudioStatus == Core.Model.Status.Stopped)
             {
                 Play();
             }
@@ -422,56 +407,46 @@ namespace Composer
             }
         }
 
-        private void SetPosition(int position)
-        {
-            Position = position;
-            PositionChanged?.Invoke(this, EventArgs.Empty);
-        }
-
         private void Record()
         {
-            if (AudioStatus == Model.Status.Stopped)
+            if (AudioStatus == Core.Model.Status.Stopped)
             {
-                SetPosition(0);
-
                 var track = AddTrack();
                 track.IsRecording = true;
-                RecordingAudio.Record(track.Model);
-                SetAudioStatus(Model.Status.Recording);
+                Audio.Record(track.Model);
+                SetAudioStatus(Core.Model.Status.Recording);
             }
         }
 
         private void Play()
         {
-            if (AudioStatus == Model.Status.Stopped)
+            if (AudioStatus == Core.Model.Status.Stopped)
             {
                 if (Song.Tracks.Any())
                 {
-                    PlaybackAudio.Play(Song);
-                    SetAudioStatus(Model.Status.Playing);
+                    Audio.Play(Song);
+                    SetAudioStatus(Core.Model.Status.Playing);
                 }
             }
         }
 
         private void Stop()
         {
-            if (AudioStatus != Model.Status.Stopped)
+            if (AudioStatus != Core.Model.Status.Stopped)
             {
                 Tracks.ForEach<UI.Track>(x => x.IsRecording = false);
-                RecordingAudio.Stop();
-                PlaybackAudio.Stop();
-                MetronomeAudio.Stop();
+                Audio.Stop();
 
-                SetAudioStatus(Model.Status.Stopped);
+                SetAudioStatus(Core.Model.Status.Stopped);
             }
         }
 
-        private void SetAudioStatus(Status status)
+        private void SetAudioStatus(Core.Model.Status status)
         {
             if (AudioStatus != status)
             {
                 AudioStatus = status;
-                AudioStatusChanged?.Invoke(this, EventArgs.Empty);
+                AddLog($"Status: {status}");
             }
         }
 
@@ -493,9 +468,9 @@ namespace Composer
 
             StoragePath = folder.Name;
 
-            Status.Text = "Saving ...";
-            Audio.Save(Song, folder);
-            Status.Text = $"Saved to {StoragePath}";
+            SetStatus("Saving ...");
+            UwpAudio.Save(Song, folder);
+            SetStatus($"Saved to {StoragePath}");
         }
 
         private void Load()

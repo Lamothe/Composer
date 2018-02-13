@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Composer.Model
+namespace Composer.Core.Model
 {
     public class Song
     {
@@ -15,6 +13,20 @@ namespace Composer.Model
         public int? BeginLoop { get; set; }
         public int? EndLoop { get; set; }
 
+        public EventHandler<Track> TrackAdded;
+
+        public Track CreateTrack(string name)
+        {
+            var track = new Track
+            {
+                Song = this,
+                Name = name
+            };
+            Tracks.Add(track);
+            TrackAdded?.Invoke(this, track);
+            return track;
+        }
+
         public void AddTrack(Model.Track track)
         {
             Tracks.Add(track);
@@ -22,7 +34,7 @@ namespace Composer.Model
 
         public int GetLastNonEmptyBarIndex()
         {
-           return Tracks.Max(track => track.GetLastNonEmptyBarIndex());
+            return Tracks.Max(track => track.GetLastNonEmptyBarIndex());
         }
     }
 }

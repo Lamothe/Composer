@@ -19,7 +19,7 @@ namespace Composer.UI
 {
     public sealed partial class Bar : UserControl
     {
-        public Model.Bar Model { get; set; }
+        public Core.Model.Bar Model { get; set; }
         private List<Line> Lines { get; set; } = new List<Line>();
         private bool UpdateUI { get; set; } = false;
         private int PixelInterval = 1;

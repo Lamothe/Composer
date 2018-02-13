@@ -7,18 +7,18 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid Name="Root">
         <Grid.RowDefinitions>
             <RowDefinition Height="100" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="200" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" Grid.Row="0">
             <Button Name="PlayButton" Content="Play/Pause" Click="PlayButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="RecordButton" Content="Record" Click="RecordButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="StopButton" Content="Stop" Click="StopButton_Click" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
-            <ToggleButton Name="MetronomeButton" Content="Metronome" Checked="MetronomeButton_Checked" Unchecked="MetronomeButton_Unchecked" VerticalAlignment="Stretch" Width="100" IsEnabled="False"/>
             <Button Name="SaveButton" Content="Save" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="SaveButton_Click" />
             <Button Name="LoadButton" Content="Load" Width="100" VerticalAlignment="Stretch" IsEnabled="False" Click="LoadButton_Click" />
             <Grid VerticalAlignment="Stretch" Background="#FF333333">
@@ -44,8 +44,14 @@
         <ScrollViewer Grid.Row="2">
             <Grid Name="Tracks"/>
         </ScrollViewer>
-        <Grid Grid.Row="3" Background="#FF202020">
-            <TextBlock Name="Status" Margin="5" />
+        <TextBox Name="Log" Grid.Row="3" FontFamily="Consolas" FontSize="12" IsReadOnly="True" Text="" AcceptsReturn="True" />
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="200"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Name="Status" Margin="5" Grid.Column="0" />
+            <TextBlock Name="Position" Margin="5" Grid.Column="1" TextAlignment="Right" />
         </Grid>
     </Grid>
 </Page>

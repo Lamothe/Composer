@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:minWidth="100dip"
+    android:minHeight="100dip">
+    <LinearLayout
+        android:orientation="horizontal"
+        android:minWidth="25px"
+        android:minHeight="25px"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/linearLayoutMain"
+        android:layout_gravity="fill"
+        android:layout_weight="10">
+        <LinearLayout
+            android:orientation="vertical"
+            android:id="@+id/linearLayoutActions"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_gravity="fill">
+            <Button
+                android:text="Play"
+                android:id="@+id/buttonPlay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="fill"
+                android:minHeight="50dip"
+                android:layout_weight="1" />
+            <Button
+                android:text="Stop"
+                android:id="@+id/buttonStop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="50dip"
+                android:layout_weight="1" />
+            <Button
+                android:text="Record"
+                android:id="@+id/buttonRecord"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="50dip"
+                android:layout_weight="1" />
+        </LinearLayout>
+        <ScrollView
+            android:minWidth="25px"
+            android:minHeight="25px"
+            android:id="@+id/scrollViewTracks"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="fill"
+            android:layout_weight="10">
+            <LinearLayout
+                android:orientation="vertical"
+                android:id="@+id/linearLayoutTracks"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_gravity="fill"
+                android:minWidth="25px"
+                android:minHeight="25px" />
+        </ScrollView>
+    </LinearLayout>
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/textViewStatus"
+        android:text="Status"
+        android:paddingLeft="10px"
+        android:paddingTop="10px"
+        android:paddingBottom="10px" />
+</LinearLayout>

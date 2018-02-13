@@ -1,15 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using Windows.Media;
-using Windows.Media.Audio;
-using Windows.Media.MediaProperties;
-using Windows.Storage;
 
-namespace Composer.Model
+namespace Composer.Core.Model
 {
     public class Track
     {
@@ -17,6 +10,7 @@ namespace Composer.Model
         public string Name { get; set; }
         public List<Bar> Bars { get; set; } = new List<Bar>();
         public bool IsMuted { get; set; }
+        public int WritePosition { get; set; } = 0;
 
         public int? GetBarIndexAtPosition(int position)
         {
@@ -76,32 +70,34 @@ namespace Composer.Model
             return buffer;
         }
 
-        public bool Write(float[] samples, int position)
+        public bool Write(float[] samples, int count)
         {
-            var bar = GetBarAtPosition(position);
+            var bar = GetBarAtPosition(WritePosition);
 
             if (bar == null)
             {
                 return false;
             }
 
-            var offset = position % Song.SamplesPerBar;
+            var offset = WritePosition % Song.SamplesPerBar;
             var remainingSpaceInBuffer = Song.SamplesPerBar - offset;
-            var length = Math.Min(samples.Length, remainingSpaceInBuffer);
+            var length = Math.Min(count, remainingSpaceInBuffer);
 
             bar.Write(samples, 0, offset, length);
 
-            if (samples.Length > remainingSpaceInBuffer)
+            if (count > remainingSpaceInBuffer)
             {
-                bar = GetBarAtPosition(position);
+                bar = GetBarAtPosition(WritePosition);
 
                 if (bar == null)
                 {
                     return false;
                 }
 
-                bar.Write(samples, length, 0, samples.Length - remainingSpaceInBuffer);
+                bar.Write(samples, length, 0, count - remainingSpaceInBuffer);
             }
+
+            WritePosition += count;
 
             return true;
         }

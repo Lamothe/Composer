@@ -19,7 +19,7 @@ namespace Composer.UI
 {
     public sealed partial class Track : UserControl
     {
-        public Model.Track Model { get; set; }
+        public Core.Model.Track Model { get; set; }
         public uint BarWidth { get; set; } = 200;
         public bool IsRecording { get; set; }
 
@@ -56,7 +56,7 @@ namespace Composer.UI
             Info.Text = $"{Model.Name}";
         }
 
-        public Bar AddBar(Model.Bar model)
+        public Bar AddBar(Core.Model.Bar model)
         {
             var ui = new Bar
             {
