@@ -30,7 +30,8 @@ namespace Composer.Model
         private const float MetronomeAmplitude = 0.3f;
         private const float MetronomeDuration = 0.1f;
 
-        public AudioGraph Graph { get; private set; }
+        private bool IsGraphStarted { get; set; }
+        private AudioGraph Graph { get; set; }
         public DeviceInformationCollection OutputDevices { get; private set; }
         private int TotalSampleCount { get; set; }
         private int BeatsPerMinute { get; set; }
@@ -51,7 +52,7 @@ namespace Composer.Model
         {
             var audio = new UwpAudio
             {
-                OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector()),                
+                OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector()),
             };
 
             var settings = new AudioGraphSettings(AudioRenderCategory.Media)
@@ -69,7 +70,6 @@ namespace Composer.Model
             audio.InputDevice = await audio.CreateInputDevice();
             audio.OutputDevice = await audio.CreateOutputDevice();
             audio.InputDevice.AddOutgoingConnection(audio.OutputDevice);
-            audio.Graph.Start();
 
             return audio;
         }
@@ -127,12 +127,24 @@ namespace Composer.Model
 
         public void Start()
         {
-            Graph.Start();
+            lock (Graph)
+            {
+                Graph.Start();
+                IsGraphStarted = true;
+            }
         }
 
         public void Stop()
         {
-            Stopped?.Invoke(this, EventArgs.Empty);
+            lock (Graph)
+            {
+                if (IsGraphStarted)
+                {
+                    Graph.Stop();
+                    IsGraphStarted = false;
+                    Stopped?.Invoke(this, EventArgs.Empty);
+                }
+            }
         }
 
         public void Reset()
@@ -203,6 +215,14 @@ namespace Composer.Model
 
         public void Record(Track track)
         {
+            lock (Graph)
+            {
+                if (IsGraphStarted)
+                {
+                    throw new Exception("Graph is already running");
+                }
+            }
+
             BeatsPerMinute = track.Song.BeatsPerMinute;
             TotalSampleCount = 0;
 
@@ -228,24 +248,33 @@ namespace Composer.Model
 
             void stopped(object sender, EventArgs e)
             {
-                frameOutputNode.Dispose();
                 Graph.QuantumStarted -= quantumStarted;
+                frameOutputNode.Dispose();
                 Stopped -= stopped;
             };
 
             Stopped += stopped;
             Graph.QuantumStarted += quantumStarted;
+
+            Start();
         }
 
         public async void Play(Song song)
         {
+            lock (Graph)
+            {
+                if (IsGraphStarted)
+                {
+                    throw new Exception("Graph is already running");
+                }
+            }
+
             if (!song.Tracks.Any())
             {
                 throw new Exception("Song does not have any tracks");
             }
 
             var position = 0;
-            OutputDevice = await CreateOutputDevice();
             var lastBarIndex = song.GetLastNonEmptyBarIndex() + 1;
 
             void quantumProcessed(AudioGraph sender, object o)
@@ -303,6 +332,8 @@ namespace Composer.Model
                 Stopped += inputStopped;
                 input.Start();
             }
+
+            Start();
         }
 
         public static async void Save(Song song, StorageFolder folder)

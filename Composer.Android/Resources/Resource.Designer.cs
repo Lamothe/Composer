@@ -44,29 +44,29 @@ namespace Composer.AndroidUI
 		public partial class Id
 		{
 			
-			// aapt resource value: 0x7f040002
-			public const int buttonPlay = 2130968578;
+			// aapt resource value: 0x7F010000
+			public const int buttonPlay = 2130771968;
 			
-			// aapt resource value: 0x7f040004
-			public const int buttonRecord = 2130968580;
+			// aapt resource value: 0x7F010001
+			public const int buttonRecord = 2130771969;
 			
-			// aapt resource value: 0x7f040003
-			public const int buttonStop = 2130968579;
+			// aapt resource value: 0x7F010002
+			public const int buttonStop = 2130771970;
 			
-			// aapt resource value: 0x7f040001
-			public const int linearLayoutActions = 2130968577;
+			// aapt resource value: 0x7F010003
+			public const int linearLayoutActions = 2130771971;
 			
-			// aapt resource value: 0x7f040000
-			public const int linearLayoutMain = 2130968576;
+			// aapt resource value: 0x7F010004
+			public const int linearLayoutMain = 2130771972;
 			
-			// aapt resource value: 0x7f040006
-			public const int linearLayoutTracks = 2130968582;
+			// aapt resource value: 0x7F010005
+			public const int linearLayoutTracks = 2130771973;
 			
-			// aapt resource value: 0x7f040005
-			public const int scrollViewTracks = 2130968581;
+			// aapt resource value: 0x7F010006
+			public const int scrollViewTracks = 2130771974;
 			
-			// aapt resource value: 0x7f040007
-			public const int textViewStatus = 2130968583;
+			// aapt resource value: 0x7F010007
+			public const int textViewStatus = 2130771975;
 			
 			static Id()
 			{
@@ -81,7 +81,7 @@ namespace Composer.AndroidUI
 		public partial class Layout
 		{
 			
-			// aapt resource value: 0x7f020000
+			// aapt resource value: 0x7F020000
 			public const int Main = 2130837504;
 			
 			static Layout()
@@ -97,7 +97,7 @@ namespace Composer.AndroidUI
 		public partial class String
 		{
 			
-			// aapt resource value: 0x7f030000
+			// aapt resource value: 0x7F030000
 			public const int app_name = 2130903040;
 			
 			static String()
