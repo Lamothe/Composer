@@ -26,9 +26,6 @@ namespace Composer.Model
     {
         private const int ElementSize = sizeof(float);
         public int SampleRate { get { return 44100; } }
-        private const int MetronomeFrequency = 440;
-        private const float MetronomeAmplitude = 0.3f;
-        private const float MetronomeDuration = 0.1f;
 
         private bool IsGraphStarted { get; set; }
         private AudioGraph Graph { get; set; }
@@ -39,8 +36,8 @@ namespace Composer.Model
         private AudioDeviceInputNode InputDevice { get; set; }
 
         public event EventHandler Stopped;
-        public event EventHandler<int> PositionUpdated;
         public event EventHandler Completed;
+        public event EventHandler<int> PositionUpdated;
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
@@ -69,7 +66,9 @@ namespace Composer.Model
 
             audio.InputDevice = await audio.CreateInputDevice();
             audio.OutputDevice = await audio.CreateOutputDevice();
-            audio.InputDevice.AddOutgoingConnection(audio.OutputDevice);
+
+            // Uncomment to allow passthrough audio *Feedback warning*
+            //audio.InputDevice.AddOutgoingConnection(audio.OutputDevice);
 
             return audio;
         }
@@ -338,7 +337,7 @@ namespace Composer.Model
 
         public static async void Save(Song song, StorageFolder folder)
         {
-            for (int trackIndex = 0; trackIndex <= song.Tracks.Count(); trackIndex++)
+            for (int trackIndex = 0; trackIndex < song.Tracks.Count(); trackIndex++)
             {
                 var track = song.Tracks[trackIndex];
                 var lastBarIndex = track.GetLastNonEmptyBarIndex();

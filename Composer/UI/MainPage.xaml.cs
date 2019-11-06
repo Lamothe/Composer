@@ -38,7 +38,7 @@ namespace Composer
         private double Zoom { get; set; } = 0;
         public Core.Model.Status AudioStatus { get; set; }
         public decimal SecondsPerBar { get; set; }
-        private UwpAudio Audio { get; set; }
+        private Core.Model.IAudio Audio { get; set; }
         private int CurrentPosition { get; set; }
         private object PositionLocker = new object();
         private SolidColorBrush DefaultBrush = new SolidColorBrush(Colors.WhiteSmoke);
@@ -129,6 +129,14 @@ namespace Composer
                 SelectedBar?.Track.SelectNext(SelectedBar);
             };
             KeyboardAccelerators.Add(right);
+
+            var up = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Up };
+            up.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                SelectedBar?.Track.SelectNext(SelectedBar);
+            };
+            KeyboardAccelerators.Add(up);
 
             var save = new KeyboardAccelerator { Key = Windows.System.VirtualKey.S, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             save.Invoked += (s, e) =>
