@@ -14,22 +14,26 @@ namespace Composer.Core.Model
         public int? EndLoop { get; set; }
 
         public EventHandler<Track> TrackAdded;
+        public EventHandler<Track> TrackRemoved;
 
-        public Track CreateTrack(string name)
+        public Track AddTrack(string name = "Untitled")
         {
             var track = new Track
             {
                 Song = this,
-                Name = name
+                Name = name,
+                Id = Guid.NewGuid()
             };
             Tracks.Add(track);
             TrackAdded?.Invoke(this, track);
             return track;
         }
 
-        public void AddTrack(Model.Track track)
+        public void RemoveTrack(Track track)
         {
-            Tracks.Add(track);
+            track.Bars.Clear();
+            Tracks.Remove(track);
+            TrackRemoved?.Invoke(this, track);
         }
 
         public int GetLastNonEmptyBarIndex()

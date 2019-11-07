@@ -8,6 +8,7 @@ namespace Composer.Core.Model
     {
         public Song Song { get; set; }
         public string Name { get; set; }
+        public Guid Id { get; set; }
         public List<Bar> Bars { get; set; } = new List<Bar>();
         public bool IsMuted { get; set; }
         public int WritePosition { get; set; } = 0;

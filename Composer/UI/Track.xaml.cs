@@ -23,7 +23,6 @@ namespace Composer.UI
         public uint BarWidth { get; set; } = 200;
         public bool IsRecording { get; set; }
 
-        public event EventHandler DeleteTrack;
         public event EventHandler<double> HorizontalPositionChanged;
 
         private static Color TrackColor = new Color { A = 0xFF, R = 0x10, G = 0x10, B = 0x10 };
@@ -35,11 +34,7 @@ namespace Composer.UI
         {
             this.InitializeComponent();
 
-            DeleteButton.Click += (s, e) =>
-            {
-                Bars.ForEach<Bar>(x => x.Delete());
-                DeleteTrack?.Invoke(this, EventArgs.Empty);
-            };
+            DeleteButton.Click += (s, e) => Model.Song.RemoveTrack(Model);
             Scroll.ViewChanged += (s, e) => HorizontalPositionChanged?.Invoke(this, Scroll.HorizontalOffset);
             MuteButton.Checked += (s, e) => Model.IsMuted = true;
             MuteButton.Unchecked += (s, e) => Model.IsMuted = false;

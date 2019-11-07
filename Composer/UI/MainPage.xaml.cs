@@ -158,6 +158,9 @@ namespace Composer
                 }
             };
 
+            Song.TrackAdded += (sender, track) => OnTrackAdded(track);
+            Song.TrackRemoved += (sender, track) => OnTrackRemoved(track);
+
             var timer = new System.Timers.Timer(200);
             timer.Elapsed += (s, e) =>
             {
@@ -322,20 +325,23 @@ namespace Composer
             }
         }
 
-        private UI.Track AddTrack()
+        private void OnTrackRemoved(Core.Model.Track track)
         {
-            var model = Song.CreateTrack(GenerateTrackName());
- 
-            var ui = new UI.Track { Model = model };
+            Stop();
+            Tracks.Children.Select(x => x as UI.Track)
+                .Where(x => x.Model == track)
+                .ToList()
+                .ForEach(x => Tracks.Children.Remove(x));
 
-            ui.DeleteTrack += (s, e) =>
-            {
-                Stop();
-                Song.Tracks.Remove(ui.Model);
-                Tracks.Children.Remove(ui);
-                int row = 0;
-                Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
-            };
+            int row = 0;
+            Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
+        }
+
+        private void OnTrackAdded(Core.Model.Track track)
+        {
+            track.Name = GenerateTrackName();
+
+            var ui = new UI.Track { Model = track };
 
             ui.HorizontalPositionChanged += (s, offset) => UpdateHorizontalPosition(offset);
             TimelineScroll.ViewChanged += (s, e) => UpdateHorizontalPosition(TimelineScroll.HorizontalOffset);
@@ -347,8 +353,8 @@ namespace Composer
 
             for (int count = 0; count < NumberOfBars; count++)
             {
-                var barModel = new Core.Model.Bar(model);
-                model.Bars.Add(barModel);
+                var barModel = new Core.Model.Bar(track);
+                track.Bars.Add(barModel);
 
                 barModel.Update += (s1, e) => Updated = true;
 
@@ -363,7 +369,9 @@ namespace Composer
                 };
             }
 
-            return ui;
+            ui.IsRecording = true;
+            Audio.Record(ui.Model);
+            SetAudioStatus(Core.Model.Status.Recording);
         }
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
@@ -419,10 +427,7 @@ namespace Composer
         {
             if (AudioStatus == Core.Model.Status.Stopped)
             {
-                var track = AddTrack();
-                track.IsRecording = true;
-                Audio.Record(track.Model);
-                SetAudioStatus(Core.Model.Status.Recording);
+                Song.AddTrack();
             }
         }
 
