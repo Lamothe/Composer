@@ -15,7 +15,7 @@ namespace Composer.UI
     public class Bar : Grid
     {
         private int LineWidth = 1;
-        private int lineCount = 0;
+        private int LineCount = 0;
 
         public bool IsHovering { get; set; } = false;
         private bool IsSelected { get; set; } = false;
@@ -59,10 +59,10 @@ namespace Composer.UI
             Update();
         }
 
+        private List<string> lines = new List<string>();
+
         public void Update()
         {
-            var numberOfLines = ActualWidth / LineWidth;
-
             if (IsSelected)
             {
                 BorderBrush = Constants.SelectedBorderBrush;
@@ -85,25 +85,28 @@ namespace Composer.UI
             }
             else
             {
+                var numberOfLines = ActualWidth / LineWidth;
+
                 var bufferInterval = (int)(Model.Buffer.Length / numberOfLines);
 
-                for (int i = lineCount; i < numberOfLines; i++)
+                for (int i = LineCount; i < numberOfLines; i++)
                 {
-                    var line = new Line();
-
                     var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
                     var y = (int)(amplitude * ActualHeight / 2);
+
+                    var line = new Line();
 
                     line.X1 = i * LineWidth;
                     line.Y1 = ActualHeight / 2 - y;
                     line.X2 = i * LineWidth;
                     line.Y2 = ActualHeight / 2 + (y == 0 ? 1 : y);
-                    line.Stroke = new SolidColorBrush(Colors.LightGray);
+                    line.Stroke = Constants.TextBrush;
                     line.StrokeThickness = LineWidth;
 
                     Canvas.Children.Add(line);
+                    lines.Add($"({line.X1}, {line.Y1}, {line.X2}, {line.Y2})");
 
-                    lineCount++;
+                    LineCount++;                    
                 }
             }
         }
