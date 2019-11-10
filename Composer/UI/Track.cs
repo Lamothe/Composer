@@ -18,7 +18,7 @@ namespace Composer.UI
             Model = model;
             Width = Constants.TrackHeight;
             Height = Constants.TrackHeight;
-            BorderBrush = Constants.DefaultBrush;
+            BorderBrush = Constants.TextBrush;
             BorderThickness = new Thickness(1);
 
             var deleteButton = new Button { Content = "Delete" };

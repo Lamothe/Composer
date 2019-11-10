@@ -15,11 +15,13 @@ namespace Composer.UI
     public class Bar : Grid
     {
         private int LineWidth = 1;
-        private static Color BarColor = new Color { A = 0xFF, R = 0x30, G = 0x30, B = 0x30 };
-        private static Color SelectedBarColor = new Color { A = 0xFF, R = 0x40, G = 0x40, B = 0x20 };
-        private static Brush BarBrush = new SolidColorBrush(BarColor);
-        private static Brush SelectedBarBrush = new SolidColorBrush(SelectedBarColor);
         private int lineCount = 0;
+
+        public bool IsHovering { get; set; } = false;
+        public bool IsSelected { get; set; } = false;
+
+        public event EventHandler<Bar> Selected;
+
         private Canvas Canvas { get; set; }
 
         public Bar(Core.Model.Bar model, UI.Track track)
@@ -29,12 +31,16 @@ namespace Composer.UI
 
             Canvas = new Canvas();
 
-            BorderBrush = Constants.DefaultBrush;
-            BorderThickness = new Thickness(2);
+            BorderThickness = new Thickness(1);
 
             Children.Add(Canvas);
             Grid.SetColumn(Canvas, 0);
             Grid.SetRow(Canvas, 0);
+
+            PointerEntered += (s, e) => { IsHovering = true; Update(); };
+            PointerExited += (s, e) => { IsHovering = false; Update(); };
+
+            Update();
         }
 
         public Core.Model.Bar Model { get; private set; }
@@ -44,6 +50,22 @@ namespace Composer.UI
         public void Update()
         {
             var numberOfLines = ActualWidth / LineWidth;
+
+            if (IsSelected)
+            {
+                BorderBrush = Constants.SelectedBorderBrush;
+                Background = Constants.SelectedBackgroundBrush;
+            }
+            else if (IsHovering)
+            {
+                BorderBrush = Constants.HighlightBorderBrush;
+                Background = Constants.HighlightBackgroundBrush;
+            }
+            else
+            {
+                BorderBrush = Constants.BorderBrush;
+                Background = Constants.BackgroundBrush;
+            }
 
             if (Model.Buffer == null)
             {

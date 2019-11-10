@@ -47,6 +47,8 @@ namespace Composer
 
             SetStatus("Initialising ...");
 
+            Background = Constants.BackgroundBrush;
+
             RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
             PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
             StopButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S });
@@ -278,7 +280,17 @@ namespace Composer
             }
 
             var ui = new UI.Bar(bar, track);
-
+            ui.PointerPressed += (s, e) =>
+            {
+                if (SelectedBar != null)
+                {
+                    SelectedBar.IsSelected = false;
+                    SelectedBar.Update();
+                }
+                SelectedBar = ui;
+                SelectedBar.IsSelected = true;
+                SelectedBar.Update();
+            };
             bar.Updated += (sender, b) => UpdateBar = ui;
             Grid.SetRow(ui, row);
             Grid.SetColumn(ui, column);
