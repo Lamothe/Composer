@@ -35,8 +35,10 @@ namespace Composer.Model
         private AudioDeviceOutputNode OutputDevice { get; set; }
         private AudioDeviceInputNode InputDevice { get; set; }
 
+        public event EventHandler Started;
         public event EventHandler Stopped;
-        public event EventHandler Completed;
+        public event EventHandler<Song> Playing;
+        public event EventHandler<Track> Recording;
         public event EventHandler<int> PositionUpdated;
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
@@ -124,12 +126,13 @@ namespace Composer.Model
             }
         }
 
-        public void Start()
+        private void Start()
         {
             lock (Graph)
             {
                 Graph.Start();
                 IsGraphStarted = true;
+                Started?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -144,11 +147,6 @@ namespace Composer.Model
                     Stopped?.Invoke(this, EventArgs.Empty);
                 }
             }
-        }
-
-        public void Reset()
-        {
-            Graph.ResetAllNodes();
         }
 
         private static unsafe float[] ReadSamplesFromFrame(AudioFrameOutputNode frameOutputNode)
@@ -238,7 +236,6 @@ namespace Composer.Model
                         // TODO: This Stop() call has thrown with a "can't call this from this thread" type message
                         // i.e. Can't stop the graph from this thread.
                         Stop();
-                        Completed?.Invoke(this, EventArgs.Empty);
                     }
 
                     PositionUpdated?.Invoke(this, track.WritePosition);
@@ -256,6 +253,7 @@ namespace Composer.Model
             Graph.QuantumStarted += quantumStarted;
 
             Start();
+            Recording?.Invoke(this, track);
         }
 
         public async void Play(Song song)
@@ -294,7 +292,6 @@ namespace Composer.Model
                 if (position / song.Tracks.First().Song.SamplesPerBar >= lastBarIndex)
                 {
                     Stop();
-                    Completed?.Invoke(this, EventArgs.Empty);
                 }
             }
 
@@ -316,9 +313,12 @@ namespace Composer.Model
                 {
                     var samples = track.Read(position, e.RequiredSamples);
 
-                    using (var frame = GenerateFrameFromSamples(samples))
+                    if (samples != null)
                     {
-                        input.AddFrame(frame);
+                        using (var frame = GenerateFrameFromSamples(samples))
+                        {
+                            input.AddFrame(frame);
+                        }
                     }
                 };
                 void inputStopped(object sender, EventArgs e)
@@ -333,6 +333,7 @@ namespace Composer.Model
             }
 
             Start();
+            Playing?.Invoke(this, song);
         }
 
         public static async void Save(Song song, StorageFolder folder)
@@ -403,7 +404,6 @@ namespace Composer.Model
                     Graph.QuantumProcessed -= quantumProcessed;
                     input.QuantumStarted -= quantumStarted;
                     Stop();
-                    Completed?.Invoke(this, EventArgs.Empty);
                 }
             }
             input.QuantumStarted += quantumStarted;

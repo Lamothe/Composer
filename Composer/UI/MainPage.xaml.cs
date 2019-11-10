@@ -33,23 +33,13 @@ namespace Composer
         private Core.Model.Song Song { get; set; }
         private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
-        private bool ScrollUpdating { get; set; } = false;
         private UI.Bar SelectedBar { get; set; } = null;
         private double Zoom { get; set; } = 0;
         public Core.Model.Status AudioStatus { get; set; }
         public decimal SecondsPerBar { get; set; }
         private Core.Model.IAudio Audio { get; set; }
         private int CurrentPosition { get; set; }
-        private object PositionLocker = new object();
-        private SolidColorBrush DefaultBrush = new SolidColorBrush(Colors.WhiteSmoke);
-        private const int NumberOfBars = 20;
-        private const int BarSize = 200;
-        private const int InfoSize = 100;
-        private const int InfoMargin = 2;
-        private const int BarMargin = 2;
-
-        private async void CallUI(DispatchedHandler f) =>
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, f);
+        private UI.Bar UpdateBar { get; set; }
 
         public MainPage()
         {
@@ -96,7 +86,6 @@ namespace Composer
                         var data = await content.GetDataAsync("PCM");
                         var pcm = data as float[];
                         pcm.CopyTo(SelectedBar.Model.Buffer, 0);
-                        SelectedBar.QueueUpdate();
                         SelectedBar.Update();
                     }
                 }
@@ -114,30 +103,6 @@ namespace Composer
             };
             KeyboardAccelerators.Add(delete);
 
-            var left = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Left };
-            left.Invoked += (s, e) =>
-            {
-                e.Handled = true;
-                SelectedBar?.Track.SelectPrevious(SelectedBar);
-            };
-            KeyboardAccelerators.Add(left);
-
-            var right = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Right };
-            right.Invoked += (s, e) =>
-            {
-                e.Handled = true;
-                SelectedBar?.Track.SelectNext(SelectedBar);
-            };
-            KeyboardAccelerators.Add(right);
-
-            var up = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Up };
-            up.Invoked += (s, e) =>
-            {
-                e.Handled = true;
-                SelectedBar?.Track.SelectNext(SelectedBar);
-            };
-            KeyboardAccelerators.Add(up);
-
             var save = new KeyboardAccelerator { Key = Windows.System.VirtualKey.S, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             save.Invoked += (s, e) =>
             {
@@ -145,6 +110,14 @@ namespace Composer
                 Save();
             };
             KeyboardAccelerators.Add(save);
+
+            var console = new KeyboardAccelerator { Key = Windows.System.VirtualKey.O, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+            console.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                ToggleOutputwindow();
+            };
+            KeyboardAccelerators.Add(console);
 
             Song = new Core.Model.Song();
 
@@ -167,10 +140,10 @@ namespace Composer
                 if (Updated)
                 {
                     Updated = false;
-                    CallUI(() =>
+                    UI.Utilities.CallUI(() =>
                     {
                         UpdatePosition(CurrentPosition);
-                        Tracks.ForEach<UI.Track>(x => x.Update());
+                        UpdateBar?.Update();
                     });
                 }
             };
@@ -181,7 +154,7 @@ namespace Composer
 
         private void AddLog(string message)
         {
-            CallUI(() => Log.Text += message + Environment.NewLine);
+            UI.Utilities.CallUIIdle((f) => Log.Text += message + Environment.NewLine);
         }
 
         private void UpdatePosition(int position)
@@ -215,65 +188,12 @@ namespace Composer
             {
                 Audio = await UwpAudio.Create();
                 Audio.PositionUpdated += (s, position) => SetPosition(position);
-                Audio.Completed += (s, e) => CallUI(() => Stop());
+                Audio.Stopped += (sender, song) => OnStopped();
+                Audio.Playing += (sender, song) => OnPlaying(song);
+                Audio.Recording += (sender, track) => OnRecording(track);
 
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
                 Song.SamplesPerBar = (int)(Audio.SamplesPerSecond * SecondsPerBar) / 2;
-
-                var dummyInfoButton = new Button
-                {
-                    Content = " ",
-                    Width = BarSize,
-                    Margin = new Thickness(InfoMargin)
-                };
-                Timeline.Children.Add(dummyInfoButton);
-                Timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-
-                var loopButtonSize = 30;
-                for (int i = 0; i < NumberOfBars; i++)
-                {
-                    var barGrid = new Grid();
-
-                    var left = new Button { Content = "<", Tag = i };
-                    var button = new Button { Content = $"Bar {i + 1}", Width = BarSize - loopButtonSize * 2 - BarMargin * 2 };
-                    var right = new Button { Content = ">", Tag = i };
-
-                    left.Click += (s, e) =>
-                    {
-                        var index = (int)left.Tag;
-                        if (!Song.EndLoop.HasValue || index <= Song.EndLoop.Value)
-                        {
-                            Song.BeginLoop = index;
-                            Updated = true;
-                        }
-                    };
-
-                    right.Click += (s, e) =>
-                    {
-                        var index = (int)right.Tag;
-                        if (!Song.BeginLoop.HasValue || index >= Song.BeginLoop.Value)
-                        {
-                            Song.EndLoop = index;
-                            Updated = true;
-                        }
-                    };
-
-                    barGrid.Children.Add(left);
-                    barGrid.Children.Add(button);
-                    barGrid.Children.Add(right);
-
-                    Grid.SetColumn(left, 0);
-                    Grid.SetColumn(button, 1);
-                    Grid.SetColumn(right, 2);
-
-                    barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(loopButtonSize) });
-                    barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                    barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(loopButtonSize) });
-
-                    Timeline.Children.Add(barGrid);
-                    Grid.SetColumn(barGrid, i + 1);
-                    Timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarSize) });
-                }
 
                 for (var bpm = 50; bpm < 300; bpm++)
                 {
@@ -294,7 +214,7 @@ namespace Composer
                 ComboBpm.IsEnabled = true;
                 ComboBeatsPerBar.IsEnabled = true;
 
-               SetStatus("Ready");
+                SetStatus("Ready");
             }
             catch (Exception ex)
             {
@@ -314,63 +234,72 @@ namespace Composer
             }
         }
 
-        private void UpdateHorizontalPosition(double offset)
-        {
-            if (!ScrollUpdating)
-            {
-                ScrollUpdating = true;
-                TimelineScroll.ChangeView(offset, 0, 1, true);
-                Tracks.ForEach<UI.Track>(x => x.UpdateScroll(offset));
-                ScrollUpdating = false;
-            }
-        }
-
         private void OnTrackRemoved(Core.Model.Track track)
         {
             Stop();
-            Tracks.Children.Select(x => x as UI.Track)
+            Tracks.GetChildren<UI.Track>()
                 .Where(x => x.Model == track)
                 .ToList()
                 .ForEach(x => Tracks.Children.Remove(x));
 
             int row = 0;
             Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
+
+            AddLog("Bar removed");
         }
 
         private void OnTrackAdded(Core.Model.Track track)
         {
+            track.BarAdded += (sender, bar) => UI.Utilities.CallUIIdle((f) => BarAdded(bar));
             track.Name = GenerateTrackName();
+            var numberOfRows = BarsContainer.RowDefinitions.Count();
 
-            var ui = new UI.Track { Model = track };
+            TrackHeaders.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Constants.TrackHeight) });
+            BarsContainer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Constants.TrackHeight) });
 
-            ui.HorizontalPositionChanged += (s, offset) => UpdateHorizontalPosition(offset);
-            TimelineScroll.ViewChanged += (s, e) => UpdateHorizontalPosition(TimelineScroll.HorizontalOffset);
-
-            Tracks.RowDefinitions.Add(new RowDefinition { Height = new GridLength(100) });
-            Grid.SetRow(ui, Tracks.Children.Count());
+            var ui = new UI.Track(track);
+            Grid.SetRow(ui, numberOfRows);
             Grid.SetColumn(ui, 0);
-            Tracks.Children.Add(ui);
+            TrackHeaders.Children.Add(ui);
 
-            for (int count = 0; count < NumberOfBars; count++)
+            AddLog("Track added");
+        }
+
+        private void BarAdded(Core.Model.Bar bar)
+        {
+            var track = TrackHeaders.GetChildren<UI.Track>().SingleOrDefault(t => t.Model == bar.Track);
+
+            var row = Grid.GetRow(track);
+            var column = bar.Track.Bars.IndexOf(bar);
+
+            while (column >= BarsContainer.ColumnDefinitions.Count)
             {
-                var barModel = new Core.Model.Bar(track);
-                track.Bars.Add(barModel);
-
-                barModel.Update += (s1, e) => Updated = true;
-
-                var barUI = ui.AddBar(barModel);
-
-                barUI.PointerPressed += (s1, e) => barUI.Select(true);
-
-                barUI.Selected += (s1, e) =>
-                {
-                    SelectedBar?.Select(false);
-                    SelectedBar = barUI;
-                };
+                BarsContainer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Constants.BarWidth) });
             }
 
-            ui.IsRecording = true;
-            Audio.Record(ui.Model);
+            var ui = new UI.Bar(bar, track);
+
+            bar.Updated += (sender, b) => UpdateBar = ui;
+            Grid.SetRow(ui, row);
+            Grid.SetColumn(ui, column);
+
+            BarsContainer.Children.Add(ui);
+
+            AddLog("Bar added");
+        }
+
+        private void OnStopped()
+        {
+            SetAudioStatus(Core.Model.Status.Stopped);
+        }
+
+        private void OnPlaying(Core.Model.Song song)
+        {
+            SetAudioStatus(Core.Model.Status.Playing);
+        }
+
+        private void OnRecording(Core.Model.Track track)
+        {
             SetAudioStatus(Core.Model.Status.Recording);
         }
 
@@ -399,18 +328,6 @@ namespace Composer
             Load();
         }
 
-        private void ToggleRecord()
-        {
-            if (AudioStatus == Core.Model.Status.Stopped)
-            {
-                Record();
-            }
-            else
-            {
-                Stop();
-            }
-        }
-
         private void TogglePlay()
         {
             if (AudioStatus == Core.Model.Status.Stopped)
@@ -427,7 +344,8 @@ namespace Composer
         {
             if (AudioStatus == Core.Model.Status.Stopped)
             {
-                Song.AddTrack();
+                var track = Song.AddTrack();
+                Audio.Record(track);
             }
         }
 
@@ -438,7 +356,6 @@ namespace Composer
                 if (Song.Tracks.Any())
                 {
                     Audio.Play(Song);
-                    SetAudioStatus(Core.Model.Status.Playing);
                 }
             }
         }
@@ -447,10 +364,7 @@ namespace Composer
         {
             if (AudioStatus != Core.Model.Status.Stopped)
             {
-                Tracks.ForEach<UI.Track>(x => x.IsRecording = false);
                 Audio.Stop();
-
-                SetAudioStatus(Core.Model.Status.Stopped);
             }
         }
 
@@ -460,6 +374,17 @@ namespace Composer
             {
                 AudioStatus = status;
                 AddLog($"Status: {status}");
+            }
+        }
+
+        private void ToggleOutputwindow()
+        {
+            if (ConsoleRow.Height.Value > 0)
+            {
+                ConsoleRow.Height = new GridLength(0);
+            }
+            {
+                ConsoleRow.Height = new GridLength(200);
             }
         }
 

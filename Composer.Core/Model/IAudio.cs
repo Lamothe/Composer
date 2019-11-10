@@ -5,8 +5,10 @@ namespace Composer.Core.Model
 {
     public interface IAudio
     {
-        event EventHandler Completed;
         event EventHandler<int> PositionUpdated;
+        event EventHandler<Song> Playing;
+        event EventHandler<Track> Recording;
+        event EventHandler Stopped;
 
         int SamplesPerSecond { get; }
 

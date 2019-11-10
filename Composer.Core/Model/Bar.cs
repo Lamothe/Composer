@@ -8,7 +8,7 @@ namespace Composer.Core.Model
 {
     public class Bar
     {
-        public event EventHandler Update;
+        public event EventHandler Updated;
 
         public float[] Buffer { get; set; }
         public Track Track { get; private set; }
@@ -21,7 +21,7 @@ namespace Composer.Core.Model
         public void SetEmpty()
         {
             Buffer = null;
-            Update?.Invoke(this, EventArgs.Empty);
+            Updated?.Invoke(this, EventArgs.Empty);
         }
 
         public void Write(float[] buffer, int sourceOffset, int destinationOffset, int length)
@@ -33,7 +33,7 @@ namespace Composer.Core.Model
 
             Array.Copy(buffer, sourceOffset, Buffer, destinationOffset, length);
 
-            Update?.Invoke(this, EventArgs.Empty);
+            Updated?.Invoke(this, EventArgs.Empty);
         }
     }
 }

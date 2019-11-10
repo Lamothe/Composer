@@ -12,7 +12,7 @@
             <RowDefinition Height="100" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="200" />
+            <RowDefinition Height="200" x:Name="ConsoleRow" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" Grid.Row="0">
@@ -38,11 +38,19 @@
                 <ComboBox Name="ComboBeatsPerBar" VerticalAlignment="Center" IsEnabled="False" Grid.Column="1" SelectionChanged="ComboBeatsPerBar_SelectionChanged" />
             </Grid>
         </StackPanel>
-        <ScrollViewer Name="TimelineScroll" Grid.Row="1" Background="#FF202020" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled">
-            <Grid Name="Timeline" Margin="2,2,2,2"/>
-        </ScrollViewer>
-        <ScrollViewer Grid.Row="2">
-            <Grid Name="Tracks"/>
+        <ScrollViewer Grid.Row="2" VerticalScrollMode="Auto" HorizontalScrollMode="Disabled">
+            <Grid Name="Tracks">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Column="0" Name="TrackHeaders" MinWidth="100">
+                </Grid>
+                <ScrollViewer Grid.Column="1" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible">
+                    <Grid Name="BarsContainer">
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
         </ScrollViewer>
         <TextBox Name="Log" Grid.Row="3" FontFamily="Consolas" FontSize="12" IsReadOnly="True" Text="" AcceptsReturn="True" />
         <Grid Grid.Row="4">

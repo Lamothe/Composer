@@ -13,6 +13,8 @@ namespace Composer.Core.Model
         public bool IsMuted { get; set; }
         public int WritePosition { get; set; } = 0;
 
+        public EventHandler<Bar> BarAdded;
+
         public int? GetBarIndexAtPosition(int position)
         {
             var barIndex = position / Song.SamplesPerBar;
@@ -77,7 +79,7 @@ namespace Composer.Core.Model
 
             if (bar == null)
             {
-                return false;
+                bar = AddBar();
             }
 
             var offset = WritePosition % Song.SamplesPerBar;
@@ -101,6 +103,14 @@ namespace Composer.Core.Model
             WritePosition += count;
 
             return true;
+        }
+
+        public Bar AddBar()
+        {
+            var bar = new Bar(this);
+            Bars.Add(bar);
+            BarAdded?.Invoke(this, bar);
+            return bar;
         }
     }
 }
