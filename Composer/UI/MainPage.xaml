@@ -47,7 +47,7 @@
                 <Grid Grid.Column="0" Name="TrackHeaders" MinWidth="100">
                 </Grid>
                 <ScrollViewer Grid.Column="1" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible">
-                    <Grid Name="BarsContainer">
+                    <Grid Name="BarGrid">
                     </Grid>
                 </ScrollViewer>
             </Grid>

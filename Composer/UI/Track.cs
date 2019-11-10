@@ -12,6 +12,7 @@ namespace Composer.UI
     {
         public Core.Model.Track Model { get; private set; }
         public event EventHandler<Track> Deleted;
+        public List<Bar> Bars { get; } = new List<Bar>();
 
         public Track(Core.Model.Track model)
         {

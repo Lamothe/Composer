@@ -13,7 +13,7 @@ namespace Composer
     {
         public static List<T> GetChildren<T>(this Panel panel)
         {
-            return panel.Children.Cast<T>().ToList();
+            return panel?.Children.Cast<T>().ToList();
         }
 
         public static void ForEach<T>(this Panel panel, Action<T> action)
@@ -40,6 +40,11 @@ namespace Composer
             {
                 scrollViewer.ChangeView(position.X, null, zoomFactor, !smoothScrolling);
             }
+        }
+
+        public static UIElement GetChildAt(this Grid grid, int row, int column)
+        {
+            return grid.GetChildren<FrameworkElement>().FirstOrDefault(x => Grid.GetRow(x) == row && Grid.GetColumn(x) == column);
         }
     }
 }

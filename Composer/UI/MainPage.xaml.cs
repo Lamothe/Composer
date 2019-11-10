@@ -105,6 +105,94 @@ namespace Composer
             };
             KeyboardAccelerators.Add(delete);
 
+            var left = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Left };
+            left.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                if (SelectedBar != null)
+                {
+                    int column = Grid.GetColumn(SelectedBar);
+                    int row = Grid.GetRow(SelectedBar);
+                    if (row >= 0 && column >= 0)
+                    {
+                        var selelcted = BarGrid.GetChildAt(row, column - 1) as UI.Bar;
+                        if (selelcted != null)
+                        {
+                            SelectedBar.Deselect();
+                            SelectedBar = selelcted;
+                            selelcted.Select();
+                        }
+                    }
+                }
+            };
+            KeyboardAccelerators.Add(left);
+
+            var right = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Right };
+            right.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                if (SelectedBar != null)
+                {
+                    int column = Grid.GetColumn(SelectedBar);
+                    int row = Grid.GetRow(SelectedBar);
+                    if (row >= 0 && column >= 0)
+                    {
+                        var selelcted = BarGrid.GetChildAt(row, column + 1) as UI.Bar;
+                        if (selelcted != null)
+                        {
+                            SelectedBar.Deselect();
+                            SelectedBar = selelcted;
+                            selelcted.Select();
+                        }
+                    }
+                }
+            };
+            KeyboardAccelerators.Add(right);
+
+            var up = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Up };
+            up.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                if (SelectedBar != null)
+                {
+                    int column = Grid.GetColumn(SelectedBar);
+                    int row = Grid.GetRow(SelectedBar);
+                    if (row >= 0 && column >= 0)
+                    {
+                        var selelcted = BarGrid.GetChildAt(row - 1, column) as UI.Bar;
+                        if (selelcted != null)
+                        {
+                            SelectedBar.Deselect();
+                            SelectedBar = selelcted;
+                            selelcted.Select();
+                        }
+                    }
+                }
+            };
+            KeyboardAccelerators.Add(up);
+
+            var down = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Down };
+            down.Invoked += (s, e) =>
+            {
+                e.Handled = true;
+                if (SelectedBar != null)
+                {
+                    int column = Grid.GetColumn(SelectedBar);
+                    int row = Grid.GetRow(SelectedBar);
+                    if (row >= 0 && column >= 0)
+                    {
+                        var selelcted = BarGrid.GetChildAt(row + 1, column) as UI.Bar;
+                        if (selelcted != null)
+                        {
+                            SelectedBar.Deselect();
+                            SelectedBar = selelcted;
+                            selelcted.Select();
+                        }
+                    }
+                }
+            };
+            KeyboardAccelerators.Add(down);
+
             var save = new KeyboardAccelerator { Key = Windows.System.VirtualKey.S, Modifiers = Windows.System.VirtualKeyModifiers.Control };
             save.Invoked += (s, e) =>
             {
@@ -254,10 +342,10 @@ namespace Composer
         {
             track.BarAdded += (sender, bar) => UI.Utilities.CallUIIdle((f) => BarAdded(bar));
             track.Name = GenerateTrackName();
-            var numberOfRows = BarsContainer.RowDefinitions.Count();
+            var numberOfRows = BarGrid.RowDefinitions.Count();
 
             TrackHeaders.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Constants.TrackHeight) });
-            BarsContainer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Constants.TrackHeight) });
+            BarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Constants.TrackHeight) });
 
             var ui = new UI.Track(track);
             Grid.SetRow(ui, numberOfRows);
@@ -274,28 +362,23 @@ namespace Composer
             var row = Grid.GetRow(track);
             var column = bar.Track.Bars.IndexOf(bar);
 
-            while (column >= BarsContainer.ColumnDefinitions.Count)
+            while (column >= BarGrid.ColumnDefinitions.Count)
             {
-                BarsContainer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Constants.BarWidth) });
+                BarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Constants.BarWidth) });
             }
 
             var ui = new UI.Bar(bar, track);
             ui.PointerPressed += (s, e) =>
             {
-                if (SelectedBar != null)
-                {
-                    SelectedBar.IsSelected = false;
-                    SelectedBar.Update();
-                }
+                SelectedBar?.Deselect();
                 SelectedBar = ui;
-                SelectedBar.IsSelected = true;
-                SelectedBar.Update();
+                SelectedBar.Select();
             };
             bar.Updated += (sender, b) => UpdateBar = ui;
             Grid.SetRow(ui, row);
             Grid.SetColumn(ui, column);
 
-            BarsContainer.Children.Add(ui);
+            BarGrid.Children.Add(ui);
 
             AddLog("Bar added");
         }

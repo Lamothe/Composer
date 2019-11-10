@@ -18,7 +18,7 @@ namespace Composer.UI
         private int lineCount = 0;
 
         public bool IsHovering { get; set; } = false;
-        public bool IsSelected { get; set; } = false;
+        private bool IsSelected { get; set; } = false;
 
         public event EventHandler<Bar> Selected;
 
@@ -46,6 +46,18 @@ namespace Composer.UI
         public Core.Model.Bar Model { get; private set; }
 
         public UI.Track Track { get; private set; }
+
+        public void Select()
+        {
+            IsSelected = true;
+            Update();
+        }
+
+        public void Deselect()
+        {
+            IsSelected = false;
+            Update();
+        }
 
         public void Update()
         {
