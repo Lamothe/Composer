@@ -14,6 +14,7 @@ namespace Composer.Core.Model
         public int WritePosition { get; set; } = 0;
 
         public EventHandler<Bar> BarAdded;
+        public EventHandler<Bar> BarRemoved;
 
         public int? GetBarIndexAtPosition(int position)
         {
@@ -111,6 +112,22 @@ namespace Composer.Core.Model
             Bars.Add(bar);
             BarAdded?.Invoke(this, bar);
             return bar;
+        }
+
+        public void RemoveBar(Bar bar)
+        {
+            var index = Bars.IndexOf(bar);
+            bar.SetEmpty();
+            Bars.Remove(bar);
+            BarRemoved?.Invoke(this, bar);
+        }
+
+        public void Clear()
+        {
+            while (Bars.Count > 0)
+            {
+                RemoveBar(Bars[0]);
+            }
         }
     }
 }

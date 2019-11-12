@@ -47,7 +47,8 @@ namespace Composer
 
             SetStatus("Initialising ...");
 
-            Background = Constants.BackgroundBrush;
+            Background = Constants.ApplicationBackgroundBrush;
+            ConsoleRow.Height = new GridLength(0);
 
             RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
             PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
@@ -86,8 +87,7 @@ namespace Composer
                     if (content.AvailableFormats.Contains("PCM"))
                     {
                         var data = await content.GetDataAsync("PCM");
-                        var pcm = data as float[];
-                        pcm.CopyTo(SelectedBar.Model.Buffer, 0);
+                        SelectedBar.Model.SetBuffer(data as float[]);
                         SelectedBar.Update();
                     }
                 }
@@ -101,6 +101,7 @@ namespace Composer
                 if (SelectedBar != null && SelectedBar.Model != null)
                 {
                     SelectedBar.Model.SetEmpty();
+                    SelectedBar.Update();
                 }
             };
             KeyboardAccelerators.Add(delete);
@@ -115,7 +116,7 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt(row, column - 1) as UI.Bar;
+                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row, column - 1);
                         if (selelcted != null)
                         {
                             SelectedBar.Deselect();
@@ -137,7 +138,7 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt(row, column + 1) as UI.Bar;
+                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row, column + 1);
                         if (selelcted != null)
                         {
                             SelectedBar.Deselect();
@@ -159,7 +160,7 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt(row - 1, column) as UI.Bar;
+                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row - 1, column);
                         if (selelcted != null)
                         {
                             SelectedBar.Deselect();
@@ -181,7 +182,7 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt(row + 1, column) as UI.Bar;
+                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row + 1, column);
                         if (selelcted != null)
                         {
                             SelectedBar.Deselect();
@@ -327,20 +328,20 @@ namespace Composer
         private void OnTrackRemoved(Core.Model.Track track)
         {
             Stop();
-            Tracks.GetChildren<UI.Track>()
-                .Where(x => x.Model == track)
-                .ToList()
-                .ForEach(x => Tracks.Children.Remove(x));
+            var index = TrackHeaders.GetChildren<UI.Track>().Select(x => x.Model).ToList().IndexOf(track);
+            TrackHeaders.Children.RemoveAt(index);
+            BarGrid.RowDefinitions.RemoveAt(0);
 
-            int row = 0;
-            Tracks.ForEach<UI.Track>(t => Grid.SetRow(t, row++));
+            TrackHeaders.GetChildren<UI.Track>(t => Grid.GetRow(t) > index).ForEach(t => Grid.SetRow(t, Grid.GetRow(t) - 1));
+            BarGrid.GetChildren<UI.Bar>(b => Grid.GetRow(b) > index).ForEach(b => Grid.SetRow(b, Grid.GetRow(b) - 1));
 
-            AddLog("Bar removed");
+            AddLog("Track removed");
         }
 
         private void OnTrackAdded(Core.Model.Track track)
         {
-            track.BarAdded += (sender, bar) => UI.Utilities.CallUIIdle((f) => BarAdded(bar));
+            track.BarAdded += (sender, bar) => UI.Utilities.CallUIIdle(f => BarAdded(bar));
+            track.BarRemoved += (sender, bar) => UI.Utilities.CallUIIdle(f => BarRemoved(bar));
             track.Name = GenerateTrackName();
             var numberOfRows = BarGrid.RowDefinitions.Count();
 
@@ -348,6 +349,7 @@ namespace Composer
             BarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Constants.TrackHeight) });
 
             var ui = new UI.Track(track);
+            ui.Deleted += (s, t) => Song.RemoveTrack(track);
             Grid.SetRow(ui, numberOfRows);
             Grid.SetColumn(ui, 0);
             TrackHeaders.Children.Add(ui);
@@ -368,7 +370,7 @@ namespace Composer
             }
 
             var ui = new UI.Bar(bar, track);
-            ui.PointerPressed += (s, e) =>
+            ui.Selected += (s, b) =>
             {
                 SelectedBar?.Deselect();
                 SelectedBar = ui;
@@ -381,6 +383,13 @@ namespace Composer
             BarGrid.Children.Add(ui);
 
             AddLog("Bar added");
+        }
+
+        private void BarRemoved(Core.Model.Bar bar)
+        {
+            var ui = BarGrid.GetChildren<UI.Bar>().Single(b => b.Model == bar);
+            BarGrid.Children.Remove(ui);
+            AddLog("Bar removed");
         }
 
         private void OnStopped()
@@ -478,6 +487,7 @@ namespace Composer
             {
                 ConsoleRow.Height = new GridLength(0);
             }
+            else
             {
                 ConsoleRow.Height = new GridLength(200);
             }

@@ -21,8 +21,13 @@ namespace Composer.UI
         private bool IsSelected { get; set; } = false;
 
         public event EventHandler<Bar> Selected;
+        public event EventHandler<Bar> Deselected;
 
         private Canvas Canvas { get; set; }
+
+        public Core.Model.Bar Model { get; private set; }
+
+        public UI.Track Track { get; private set; }
 
         public Bar(Core.Model.Bar model, UI.Track track)
         {
@@ -39,27 +44,24 @@ namespace Composer.UI
 
             PointerEntered += (s, e) => { IsHovering = true; Update(); };
             PointerExited += (s, e) => { IsHovering = false; Update(); };
+            PointerPressed += (s, e) => Select();
 
             Update();
         }
 
-        public Core.Model.Bar Model { get; private set; }
-
-        public UI.Track Track { get; private set; }
-
         public void Select()
         {
             IsSelected = true;
+            Selected?.Invoke(null, this);
             Update();
         }
 
         public void Deselect()
         {
             IsSelected = false;
+            Deselected?.Invoke(this, this);
             Update();
         }
-
-        private List<string> lines = new List<string>();
 
         public void Update()
         {
@@ -104,9 +106,8 @@ namespace Composer.UI
                     line.StrokeThickness = LineWidth;
 
                     Canvas.Children.Add(line);
-                    lines.Add($"({line.X1}, {line.Y1}, {line.X2}, {line.Y2})");
 
-                    LineCount++;                    
+                    LineCount++;
                 }
             }
         }

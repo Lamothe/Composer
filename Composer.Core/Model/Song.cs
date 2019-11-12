@@ -31,7 +31,7 @@ namespace Composer.Core.Model
 
         public void RemoveTrack(Track track)
         {
-            track.Bars.Clear();
+            track.Clear();
             Tracks.Remove(track);
             TrackRemoved?.Invoke(this, track);
         }

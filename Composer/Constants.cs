@@ -16,6 +16,8 @@ namespace Composer
         public const int TrackHeight = 100;
         public const int BarWidth = 200;
 
+        public static SolidColorBrush ApplicationBackgroundBrush { get; } = new SolidColorBrush(Color.FromArgb(0x2d, 0xFF, 0xFF, 0xFF));
+
         public static SolidColorBrush TextBrush { get; } = new SolidColorBrush(Colors.DarkGray);
         public static SolidColorBrush BackgroundBrush { get; } = new SolidColorBrush(Color.FromArgb(0x1c, 0xFF, 0xFF, 0xFF));        
         public static SolidColorBrush BorderBrush { get; } = new SolidColorBrush(Colors.DarkGray);

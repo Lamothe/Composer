@@ -42,9 +42,20 @@ namespace Composer
             }
         }
 
-        public static UIElement GetChildAt(this Grid grid, int row, int column)
+        public static T GetChildAt<T>(this Grid grid, int row, int column)
+            where T : FrameworkElement
         {
-            return grid.GetChildren<FrameworkElement>().FirstOrDefault(x => Grid.GetRow(x) == row && Grid.GetColumn(x) == column);
+            return grid.GetChildren<T>(x => Grid.GetRow(x) == row && Grid.GetColumn(x) == column).First();
+        }
+
+        public static List<T> GetChildren<T>(this Grid grid, Func<T, bool> f)
+        {
+            return grid.GetChildren<T>().Where(f).ToList();
+        }
+
+        public static void DeleteChildren(this Grid grid, Func<FrameworkElement, bool> f)
+        {
+            grid.GetChildren(f).ForEach(c => grid.Children.Remove(c));
         }
     }
 }
