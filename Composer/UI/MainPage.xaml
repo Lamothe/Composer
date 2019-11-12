@@ -53,13 +53,13 @@
             </Grid>
         </ScrollViewer>
         <TextBox Name="Log" Grid.Row="3" FontFamily="Consolas" FontSize="12" IsReadOnly="True" Text="" AcceptsReturn="True" />
-        <Grid Grid.Row="4">
+        <Grid Grid.Row="4" Name="StatusBar">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="200"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Name="Status" Margin="5" Grid.Column="0" />
-            <TextBlock Name="Position" Margin="5" Grid.Column="1" TextAlignment="Right" />
+            <TextBlock Name="Status" Margin="5" Grid.Column="0" MaxLines="1" />
+            <TextBlock Name="Position" Margin="5" Grid.Column="1" TextAlignment="Right" MaxLines="1" />
         </Grid>
     </Grid>
 </Page>

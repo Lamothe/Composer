@@ -34,7 +34,9 @@ namespace Composer.Model
         private int BeatsPerMinute { get; set; }
         private AudioDeviceOutputNode OutputDevice { get; set; }
         private AudioDeviceInputNode InputDevice { get; set; }
+        public bool IsReady { get; private set; }
 
+        public event EventHandler Ready;
         public event EventHandler Started;
         public event EventHandler Stopped;
         public event EventHandler<Song> Playing;
@@ -43,16 +45,14 @@ namespace Composer.Model
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
-        private UwpAudio()
+        public UwpAudio()
         {
+            Create();
         }
 
-        public static async Task<UwpAudio> Create()
+        private async void Create()
         {
-            var audio = new UwpAudio
-            {
-                OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector()),
-            };
+            OutputDevices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector());
 
             var settings = new AudioGraphSettings(AudioRenderCategory.Media)
             {
@@ -64,15 +64,13 @@ namespace Composer.Model
             {
                 throw new ApplicationException($"Audio graph error: {audioGraphResult.Status}");
             }
-            audio.Graph = audioGraphResult.Graph;
+            Graph = audioGraphResult.Graph;
 
-            audio.InputDevice = await audio.CreateInputDevice();
-            audio.OutputDevice = await audio.CreateOutputDevice();
+            InputDevice = await CreateInputDevice();
+            OutputDevice = await CreateOutputDevice();
 
-            // Uncomment to allow passthrough audio *Feedback warning*
-            //audio.InputDevice.AddOutgoingConnection(audio.OutputDevice);
-
-            return audio;
+            Ready?.Invoke(this, EventArgs.Empty);
+            IsReady = true;
         }
 
         public async Task<AudioDeviceInputNode> CreateInputDevice()
@@ -182,7 +180,7 @@ namespace Composer.Model
         private static unsafe AudioFrame GenerateFrameFromSamples(float[] samples)
         {
             var bufferSizeInBytes = samples.Length * ElementSize;
-
+            
             var frame = new AudioFrame((uint)bufferSizeInBytes);
             using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
             {

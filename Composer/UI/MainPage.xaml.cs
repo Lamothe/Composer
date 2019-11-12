@@ -49,6 +49,8 @@ namespace Composer
             SetStatus("Initialising ...");
 
             Background = Constants.ApplicationBackgroundBrush;
+            StatusBar.Background = Constants.StatusBarBackgroundBrush;
+            StatusBar.BorderBrush = Constants.StatusBarBorderBrush;
             ConsoleRow.Height = new GridLength(0);
 
             RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
@@ -233,7 +235,8 @@ namespace Composer
             };
             timer.Start();
 
-            Init();
+            Audio = new UwpAudio();
+            Audio.Ready += (s, e) => OnAudioReady();
         }
 
         private void AddLog(string message)
@@ -266,11 +269,22 @@ namespace Composer
             AddLog(message);
         }
 
-        private async void Init()
+        private string GenerateTrackName()
+        {
+            while (true)
+            {
+                var name = $"Track {++TrackSequence}";
+                if (!Song.Tracks.Any(x => x.Name == name))
+                {
+                    return name;
+                }
+            }
+        }
+
+        private void OnAudioReady()
         {
             try
             {
-                Audio = await UwpAudio.Create();
                 Audio.PositionUpdated += (s, position) => SetPosition(position);
                 Audio.Stopped += (sender, song) => OnStopped();
                 Audio.Playing += (sender, song) => OnPlaying(song);
@@ -303,18 +317,6 @@ namespace Composer
             catch (Exception ex)
             {
                 SetStatus($"Exception: {ex.Message}");
-            }
-        }
-
-        private string GenerateTrackName()
-        {
-            while (true)
-            {
-                var name = $"Track {++TrackSequence}";
-                if (!Song.Tracks.Any(x => x.Name == name))
-                {
-                    return name;
-                }
             }
         }
 

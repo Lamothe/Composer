@@ -5,6 +5,7 @@ namespace Composer.Core.Model
 {
     public interface IAudio
     {
+        event EventHandler Ready;
         event EventHandler<int> PositionUpdated;
         event EventHandler<Song> Playing;
         event EventHandler<Track> Recording;

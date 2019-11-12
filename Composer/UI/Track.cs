@@ -23,6 +23,8 @@ namespace Composer.UI
             BorderThickness = new Thickness(1);
 
             var deleteButton = new Button { Content = "Delete" };
+            deleteButton.VerticalAlignment = VerticalAlignment.Bottom;
+            deleteButton.HorizontalAlignment = HorizontalAlignment.Stretch;
             deleteButton.Click += (object sender, RoutedEventArgs e) => Deleted?.Invoke(sender, this);
             Children.Add(new TextBlock { Text = model?.Name });
             Children.Add(deleteButton);
