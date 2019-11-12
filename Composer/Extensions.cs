@@ -45,7 +45,7 @@ namespace Composer
         public static T GetChildAt<T>(this Grid grid, int row, int column)
             where T : FrameworkElement
         {
-            return grid.GetChildren<T>(x => Grid.GetRow(x) == row && Grid.GetColumn(x) == column).First();
+            return grid.GetChildren<T>(x => Grid.GetRow(x) == row && Grid.GetColumn(x) == column).FirstOrDefault();
         }
 
         public static List<T> GetChildren<T>(this Grid grid, Func<T, bool> f)

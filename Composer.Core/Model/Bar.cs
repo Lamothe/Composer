@@ -8,38 +8,38 @@ namespace Composer.Core.Model
 {
     public class Bar
     {
-        public event EventHandler Updated;
+        public event EventHandler<bool> Updated;
 
-        public float[] Buffer { get; set; }
+        public float[] Buffer { get; private set; }
+        public int Length { get; private set; } = 0;
 
         public Track Track { get; private set; }
 
         public Bar(Track track)
         {
             Track = track;
+            Buffer = new float[Track.Song.SamplesPerBar];
         }
 
         public void SetEmpty()
         {
-            Buffer = null;
-            Updated?.Invoke(this, EventArgs.Empty);
+            Buffer = new float[Track.Song.SamplesPerBar];
+            Length = 0;
+            Updated?.Invoke(this, true);
         }
 
         public void SetBuffer(float[] buffer)
         {
-            buffer?.CopyTo(Buffer, 0);
+            buffer.CopyTo(Buffer, 0);
+            Length = buffer.Length;
+            Updated?.Invoke(this, true);
         }
 
         public void Write(float[] buffer, int sourceOffset, int destinationOffset, int length)
         {
-            if (Buffer == null)
-            {
-                Buffer = new float[Track.Song.SamplesPerBar];
-            }
-
             Array.Copy(buffer, sourceOffset, Buffer, destinationOffset, length);
-
-            Updated?.Invoke(this, EventArgs.Empty);
+            Length += length;
+            Updated?.Invoke(this, false);
         }
     }
 }

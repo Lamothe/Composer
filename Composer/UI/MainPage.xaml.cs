@@ -40,6 +40,7 @@ namespace Composer
         private Core.Model.IAudio Audio { get; set; }
         private int CurrentPosition { get; set; }
         private UI.Bar UpdateBar { get; set; }
+        private bool FullBarUpdate { get; set; }
 
         public MainPage()
         {
@@ -80,7 +81,7 @@ namespace Composer
                 {
                     if (SelectedBar.Model.Buffer == null)
                     {
-                        SelectedBar.Model.Buffer = new float[Song.SamplesPerBar];
+                        SelectedBar.Model.SetBuffer(new float[Song.SamplesPerBar]);
                     }
 
                     var content = Clipboard.GetContent();
@@ -116,12 +117,10 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row, column - 1);
-                        if (selelcted != null)
+                        var selected = BarGrid.GetChildAt<UI.Bar>(row, column - 1);
+                        if (selected != null)
                         {
-                            SelectedBar.Deselect();
-                            SelectedBar = selelcted;
-                            selelcted.Select();
+                            selected.Select();
                         }
                     }
                 }
@@ -138,12 +137,10 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row, column + 1);
-                        if (selelcted != null)
+                        var selected = BarGrid.GetChildAt<UI.Bar>(row, column + 1);
+                        if (selected != null)
                         {
-                            SelectedBar.Deselect();
-                            SelectedBar = selelcted;
-                            selelcted.Select();
+                            selected.Select();
                         }
                     }
                 }
@@ -160,12 +157,10 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row - 1, column);
-                        if (selelcted != null)
+                        var selected = BarGrid.GetChildAt<UI.Bar>(row - 1, column);
+                        if (selected != null)
                         {
-                            SelectedBar.Deselect();
-                            SelectedBar = selelcted;
-                            selelcted.Select();
+                            selected.Select();
                         }
                     }
                 }
@@ -182,12 +177,10 @@ namespace Composer
                     int row = Grid.GetRow(SelectedBar);
                     if (row >= 0 && column >= 0)
                     {
-                        var selelcted = BarGrid.GetChildAt<UI.Bar>(row + 1, column);
-                        if (selelcted != null)
+                        var selected = BarGrid.GetChildAt<UI.Bar>(row + 1, column);
+                        if (selected != null)
                         {
-                            SelectedBar.Deselect();
-                            SelectedBar = selelcted;
-                            selelcted.Select();
+                            selected.Select();
                         }
                     }
                 }
@@ -225,7 +218,7 @@ namespace Composer
             Song.TrackAdded += (sender, track) => OnTrackAdded(track);
             Song.TrackRemoved += (sender, track) => OnTrackRemoved(track);
 
-            var timer = new System.Timers.Timer(200);
+            var timer = new System.Timers.Timer(100);
             timer.Elapsed += (s, e) =>
             {
                 if (Updated)
@@ -234,7 +227,7 @@ namespace Composer
                     UI.Utilities.CallUI(() =>
                     {
                         UpdatePosition(CurrentPosition);
-                        UpdateBar?.Update();
+                        UpdateBar?.Update(FullBarUpdate);
                     });
                 }
             };
@@ -364,7 +357,7 @@ namespace Composer
             var row = Grid.GetRow(track);
             var column = bar.Track.Bars.IndexOf(bar);
 
-            while (column >= BarGrid.ColumnDefinitions.Count)
+            while (BarGrid.ColumnDefinitions.Count <= column)
             {
                 BarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Constants.BarWidth) });
             }
@@ -374,9 +367,12 @@ namespace Composer
             {
                 SelectedBar?.Deselect();
                 SelectedBar = ui;
-                SelectedBar.Select();
             };
-            bar.Updated += (sender, b) => UpdateBar = ui;
+            bar.Updated += (sender, b) =>
+            {
+                UpdateBar = ui;
+                FullBarUpdate = b;
+            };
             Grid.SetRow(ui, row);
             Grid.SetColumn(ui, column);
 

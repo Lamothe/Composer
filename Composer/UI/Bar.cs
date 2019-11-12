@@ -14,7 +14,7 @@ namespace Composer.UI
 {
     public class Bar : Grid
     {
-        private int LineWidth = 1;
+        private int LineWidth = 2;
         private int LineCount = 0;
 
         public bool IsHovering { get; set; } = false;
@@ -63,8 +63,13 @@ namespace Composer.UI
             Update();
         }
 
-        public void Update()
+        public void Update(bool fullUpdate = false)
         {
+            if (fullUpdate)
+            {
+                Canvas.Children.Clear();
+            }
+
             if (IsSelected)
             {
                 BorderBrush = Constants.SelectedBorderBrush;
@@ -81,34 +86,28 @@ namespace Composer.UI
                 Background = Constants.BackgroundBrush;
             }
 
-            if (Model.Buffer == null)
+            var numberOfLinesTotal = ActualWidth / LineWidth;
+            var bufferInterval = (int)(Model.Buffer.Length / numberOfLinesTotal);
+            var numberOfLines = numberOfLinesTotal * Model.Length / Model.Buffer.Length;
+            var startLine = fullUpdate ? 0 : LineCount;
+
+            for (int i = startLine; i < numberOfLines; i++)
             {
-                Canvas.Children.Clear();
-            }
-            else
-            {
-                var numberOfLines = ActualWidth / LineWidth;
+                var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
+                var y = (int)(amplitude * ActualHeight / 4);
 
-                var bufferInterval = (int)(Model.Buffer.Length / numberOfLines);
+                var line = new Line();
 
-                for (int i = LineCount; i < numberOfLines; i++)
-                {
-                    var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
-                    var y = (int)(amplitude * ActualHeight / 2);
+                line.X1 = i * LineWidth;
+                line.Y1 = (ActualHeight - y) / 2;
+                line.X2 = i * LineWidth;
+                line.Y2 = (ActualHeight + (y == 0 ? 1 : y)) / 2;
+                line.Stroke = Constants.TextBrush;
+                line.StrokeThickness = LineWidth;
 
-                    var line = new Line();
+                Canvas.Children.Add(line);
 
-                    line.X1 = i * LineWidth;
-                    line.Y1 = ActualHeight / 2 - y;
-                    line.X2 = i * LineWidth;
-                    line.Y2 = ActualHeight / 2 + (y == 0 ? 1 : y);
-                    line.Stroke = Constants.TextBrush;
-                    line.StrokeThickness = LineWidth;
-
-                    Canvas.Children.Add(line);
-
-                    LineCount++;
-                }
+                LineCount++;
             }
         }
     }
