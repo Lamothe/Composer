@@ -27,7 +27,7 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Composer
 {
-    public sealed partial class MainPage : Page
+    public sealed partial class MainPage : Page, IDisposable
     {
         private string StoragePath = null;
         private Core.Model.Song Song { get; set; }
@@ -41,6 +41,7 @@ namespace Composer
         private int CurrentPosition { get; set; }
         private UI.Bar UpdateBar { get; set; }
         private bool FullBarUpdate { get; set; }
+        private System.Timers.Timer Timer { get; set; }
 
         public MainPage()
         {
@@ -48,11 +49,48 @@ namespace Composer
 
             SetStatus("Initialising ...");
 
+            App.Current.UnhandledException += (s, e) =>
+            {
+                AddLog(e.Message);
+                SetStatus("Failed to initialise");
+            };
+
             Background = Constants.ApplicationBackgroundBrush;
             StatusBar.Background = Constants.StatusBarBackgroundBrush;
             StatusBar.BorderBrush = Constants.StatusBarBorderBrush;
             ConsoleRow.Height = new GridLength(0);
 
+            InitialiseKeyboardAccelerators();
+            CreateSong();
+
+            Timer = new System.Timers.Timer(100);
+            Timer.Elapsed += (s, e) =>
+            {
+                if (Updated)
+                {
+                    Updated = false;
+                    UI.Utilities.CallUI(() =>
+                    {
+                        UpdatePosition(CurrentPosition);
+                        UpdateBar?.Update(FullBarUpdate);
+                    });
+                }
+            };
+            Timer.Start();
+
+            Audio = new UwpAudio();
+            Audio.Ready += (s, e) => OnAudioReady();
+        }
+
+        private void CreateSong()
+        {
+            Song = new Core.Model.Song();
+            Song.TrackAdded += (sender, track) => OnTrackAdded(track);
+            Song.TrackRemoved += (sender, track) => OnTrackRemoved(track);
+        }
+
+        private void InitialiseKeyboardAccelerators()
+        {
             RecordButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.R });
             PlayButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.P });
             StopButton.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = Windows.System.VirtualKey.S });
@@ -204,39 +242,6 @@ namespace Composer
                 ToggleOutputwindow();
             };
             KeyboardAccelerators.Add(console);
-
-            Song = new Core.Model.Song();
-
-            Tracks.PointerWheelChanged += (s, e) =>
-            {
-                var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
-
-                if ((e.KeyModifiers & Windows.System.VirtualKeyModifiers.Control) != 0)
-                {
-                    Zoom += delta * 0.01;
-                }
-            };
-
-            Song.TrackAdded += (sender, track) => OnTrackAdded(track);
-            Song.TrackRemoved += (sender, track) => OnTrackRemoved(track);
-
-            var timer = new System.Timers.Timer(100);
-            timer.Elapsed += (s, e) =>
-            {
-                if (Updated)
-                {
-                    Updated = false;
-                    UI.Utilities.CallUI(() =>
-                    {
-                        UpdatePosition(CurrentPosition);
-                        UpdateBar?.Update(FullBarUpdate);
-                    });
-                }
-            };
-            timer.Start();
-
-            Audio = new UwpAudio();
-            Audio.Ready += (s, e) => OnAudioReady();
         }
 
         private void AddLog(string message)
@@ -544,6 +549,11 @@ namespace Composer
                 ComboBeatsPerBar.SelectedItem = Song.BeatsPerBar;
                 Status.Text = "Can't set beats per bar on a song with tracks.";
             }
+        }
+
+        public void Dispose()
+        {
+            Timer?.Dispose();
         }
     }
 }

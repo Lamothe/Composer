@@ -34,7 +34,6 @@ namespace Composer.Model
         private int BeatsPerMinute { get; set; }
         private AudioDeviceOutputNode OutputDevice { get; set; }
         private AudioDeviceInputNode InputDevice { get; set; }
-        public bool IsReady { get; private set; }
 
         public event EventHandler Ready;
         public event EventHandler Started;
@@ -66,11 +65,10 @@ namespace Composer.Model
             }
             Graph = audioGraphResult.Graph;
 
-            InputDevice = await CreateInputDevice();
-            OutputDevice = await CreateOutputDevice();
+            InputDevice = await CreateInputDevice().ConfigureAwait(true);
+            OutputDevice = await CreateOutputDevice().ConfigureAwait(true);
 
             Ready?.Invoke(this, EventArgs.Empty);
-            IsReady = true;
         }
 
         public async Task<AudioDeviceInputNode> CreateInputDevice()
