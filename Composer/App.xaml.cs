@@ -46,6 +46,8 @@ namespace Composer
 
             var dialog = new MessageDialog(message);
             await dialog.ShowAsync();
+
+            e.Handled = true;
         }
 
         /// <summary>
