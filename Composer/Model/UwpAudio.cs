@@ -25,7 +25,6 @@ namespace Composer.Model
     public class UwpAudio : IAudio, IDisposable
     {
         private const int ElementSize = sizeof(float);
-        public int SampleRate { get { return 44100; } }
 
         private bool IsGraphStarted { get; set; }
         private AudioGraph Graph { get; set; }

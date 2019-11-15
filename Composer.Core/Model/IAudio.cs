@@ -13,8 +13,6 @@ namespace Composer.Core.Model
 
         int SamplesPerSecond { get; }
 
-        int SampleRate { get; }
-
         void Record(Track track);
 
         void Play(Song song);
