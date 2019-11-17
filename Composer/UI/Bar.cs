@@ -19,6 +19,7 @@ namespace Composer.UI
 
         public bool IsHovering { get; set; } = false;
         private bool IsSelected { get; set; } = false;
+        public bool FullUpdate { get; set; }
 
         public event EventHandler<Bar> Selected;
         public event EventHandler<Bar> Deselected;
@@ -63,9 +64,9 @@ namespace Composer.UI
             Update();
         }
 
-        public void Update(bool fullUpdate = false)
+        public void Update()
         {
-            if (fullUpdate)
+            if (FullUpdate)
             {
                 Canvas.Children.Clear();
             }
@@ -86,16 +87,15 @@ namespace Composer.UI
                 Background = Constants.BackgroundBrush;
             }
 
-            var numberOfLinesTotal = ActualWidth / LineWidth;
-            var bufferInterval = (int)(Model.Buffer.Length / numberOfLinesTotal);
-            var numberOfLines = numberOfLinesTotal * Model.Length / Model.Buffer.Length;
-            var startLine = fullUpdate ? 0 : LineCount;
+            var numberOfLinesPerBar = ActualWidth / LineWidth;
+            var bufferInterval = (int)(Model.Buffer.Length / numberOfLinesPerBar);
+            var startLine = FullUpdate ? 0 : LineCount;
+            var endLine = numberOfLinesPerBar * Model.Length / Model.Buffer.Length;
 
-            for (int i = startLine; i < numberOfLines; i++)
+            for (int i = startLine; i < endLine; i++)
             {
                 var amplitude = Model.Buffer.Skip(i * bufferInterval).Take(bufferInterval).Max();
                 var y = (int)(amplitude * ActualHeight / 4);
-
                 var line = new Line();
 
                 line.X1 = i * LineWidth;
@@ -109,6 +109,8 @@ namespace Composer.UI
 
                 LineCount++;
             }
+
+            FullUpdate = false;
         }
     }
 }

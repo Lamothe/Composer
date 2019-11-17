@@ -11,10 +11,11 @@ namespace Composer.Core.Model
         public Guid Id { get; set; }
         public List<Bar> Bars { get; set; } = new List<Bar>();
         public bool IsMuted { get; set; }
-        public int WritePosition { get; set; } = 0;
+        public int Position { get; set; } = 0;
 
         public EventHandler<Bar> BarAdded;
         public EventHandler<Bar> BarRemoved;
+        public EventHandler<Track> PositionUpdated;
 
         public int? GetBarIndexAtPosition(int position)
         {
@@ -76,14 +77,14 @@ namespace Composer.Core.Model
 
         public bool Write(float[] samples, int count)
         {
-            var bar = GetBarAtPosition(WritePosition);
+            var bar = GetBarAtPosition(Position);
 
             if (bar == null)
             {
                 bar = AddBar();
             }
 
-            var offset = WritePosition % Song.SamplesPerBar;
+            var offset = Position % Song.SamplesPerBar;
             var remainingSpaceInBuffer = Song.SamplesPerBar - offset;
             var length = Math.Min(count, remainingSpaceInBuffer);
 
@@ -91,7 +92,7 @@ namespace Composer.Core.Model
 
             if (count > remainingSpaceInBuffer)
             {
-                bar = GetBarAtPosition(WritePosition);
+                bar = GetBarAtPosition(Position);
 
                 if (bar == null)
                 {
@@ -101,7 +102,8 @@ namespace Composer.Core.Model
                 bar.Write(samples, length, 0, count - remainingSpaceInBuffer);
             }
 
-            WritePosition += count;
+            Position += count;
+            PositionUpdated?.Invoke(this, this);
 
             return true;
         }

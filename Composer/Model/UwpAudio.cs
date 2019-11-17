@@ -1,5 +1,6 @@
 ﻿using Composer.Core.Model;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,8 +30,6 @@ namespace Composer.Model
         private bool IsGraphStarted { get; set; }
         private AudioGraph Graph { get; set; }
         public DeviceInformationCollection OutputDevices { get; private set; }
-        private int TotalSampleCount { get; set; }
-        private int BeatsPerMinute { get; set; }
         private AudioDeviceOutputNode OutputDevice { get; set; }
         private AudioDeviceInputNode InputDevice { get; set; }
 
@@ -39,7 +38,6 @@ namespace Composer.Model
         public event EventHandler Stopped;
         public event EventHandler<Song> Playing;
         public event EventHandler<Track> Recording;
-        public event EventHandler<int> PositionUpdated;
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
@@ -177,7 +175,7 @@ namespace Composer.Model
         private static unsafe AudioFrame GenerateFrameFromSamples(float[] samples)
         {
             var bufferSizeInBytes = samples.Length * ElementSize;
-            
+
             var frame = new AudioFrame((uint)bufferSizeInBytes);
             using (var buffer = frame.LockBuffer(AudioBufferAccessMode.Write))
             {
@@ -215,9 +213,6 @@ namespace Composer.Model
                 }
             }
 
-            BeatsPerMinute = track.Song.BeatsPerMinute;
-            TotalSampleCount = 0;
-
             var frameOutputNode = CreateFrameOutputNode();
             InputDevice.AddOutgoingConnection(frameOutputNode);
 
@@ -228,12 +223,8 @@ namespace Composer.Model
                 {
                     if (!track.Write(samples, samples.Length))
                     {
-                        // TODO: This Stop() call has thrown with a "can't call this from this thread" type message
-                        // i.e. Can't stop the graph from this thread.
                         Stop();
                     }
-
-                    PositionUpdated?.Invoke(this, track.WritePosition);
                 }
             }
 
@@ -251,8 +242,15 @@ namespace Composer.Model
             Recording?.Invoke(this, track);
         }
 
-        public async void Play(Song song)
+        public async void Play(Song song, int position = 0)
         {
+            if (song == null)
+            {
+                throw new ArgumentNullException(nameof(song));
+            }
+
+            song.SetPosition(position);
+
             lock (Graph)
             {
                 if (IsGraphStarted)
@@ -266,64 +264,33 @@ namespace Composer.Model
                 throw new Exception("Song does not have any tracks");
             }
 
-            var position = 0;
-            var lastBarIndex = song.GetLastNonEmptyBarIndex() + 1;
-
-            void quantumProcessed(AudioGraph sender, object o)
+            Graph.QuantumProcessed += (s, e) =>
             {
-                position += Graph.SamplesPerQuantum;
-
-                if (song.BeginLoop.HasValue && song.EndLoop.HasValue)
-                {
-                    var barIndex = position / song.SamplesPerBar;
-                    if (barIndex > song.EndLoop)
-                    {
-                        position = song.BeginLoop.Value * song.SamplesPerBar;
-                    }
-                }
-
-                PositionUpdated?.Invoke(this, position);
-
-                if (position / song.Tracks.First().Song.SamplesPerBar >= lastBarIndex)
+                var lastBarIndex = song.GetLastNonEmptyBarIndex() + 1;
+                if (song.GetCurrentBar() >= lastBarIndex)
                 {
                     Stop();
                 }
-            }
-
-            Graph.QuantumProcessed += quantumProcessed;
-
-            void stopped(object sender, EventArgs e)
-            {
-                Graph.QuantumProcessed -= quantumProcessed;
-                Stopped -= stopped;
             };
-
-            Stopped += stopped;
 
             foreach (var track in song.Tracks)
             {
                 var input = CreateFrameInputNode();
                 input.AddOutgoingConnection(OutputDevice);
-                void quantumStarted(AudioFrameInputNode sender, FrameInputNodeQuantumStartedEventArgs e)
+                input.QuantumStarted += (inputNode, e) =>
                 {
-                    var samples = track.Read(position, e.RequiredSamples);
+                    var samples = track.Read(track.Position, e.RequiredSamples);
 
                     if (samples != null)
                     {
                         using (var frame = GenerateFrameFromSamples(samples))
                         {
-                            input.AddFrame(frame);
+                            inputNode.AddFrame(frame);
                         }
                     }
+
+                    track.Position += Graph.SamplesPerQuantum;
                 };
-                void inputStopped(object sender, EventArgs e)
-                {
-                    input.QuantumStarted -= quantumStarted;
-                    input.Dispose();
-                    Stopped -= inputStopped;
-                }
-                input.QuantumStarted += quantumStarted;
-                Stopped += inputStopped;
                 input.Start();
             }
 
@@ -331,18 +298,22 @@ namespace Composer.Model
             Playing?.Invoke(this, song);
         }
 
-        public static async void Save(Song song, StorageFolder folder)
+        public static async void Save(Song song, StorageFolder folder, string fileName)
         {
             for (int trackIndex = 0; trackIndex < song.Tracks.Count(); trackIndex++)
             {
                 var track = song.Tracks[trackIndex];
                 var lastBarIndex = track.GetLastNonEmptyBarIndex();
+                var file = await folder?.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+
+                if (file == null)
+                {
+                    throw new Exception($"Failed to create file '{fileName}'");
+                }
+
                 for (int barIndex = 0; barIndex <= lastBarIndex; barIndex++)
                 {
-                    var fileName = $"bar-{trackIndex}-{barIndex}.pcm";
-                    var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
-
-                    using (var stream = await file.OpenStreamForWriteAsync())
+                    using (var stream = await file.OpenStreamForWriteAsync().ConfigureAwait(false))
                     {
                         var bar = track.Bars[lastBarIndex];
                         if (bar.Buffer != null)

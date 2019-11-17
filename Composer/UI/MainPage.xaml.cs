@@ -1,5 +1,6 @@
 ﻿using Composer.Model;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -31,17 +32,14 @@ namespace Composer
     {
         private string StoragePath = null;
         private Core.Model.Song Song { get; set; }
-        private bool Updated { get; set; } = false;
         private int TrackSequence { get; set; } = 0;
         private UI.Bar SelectedBar { get; set; } = null;
-        private double Zoom { get; set; } = 0;
         public Core.Model.Status AudioStatus { get; set; }
         public decimal SecondsPerBar { get; set; }
         private Core.Model.IAudio Audio { get; set; }
-        private int CurrentPosition { get; set; }
-        private UI.Bar UpdateBar { get; set; }
-        private bool FullBarUpdate { get; set; }
+        private ConcurrentQueue<UI.Bar> UpdateBars { get; set; } = new ConcurrentQueue<UI.Bar>();
         private System.Timers.Timer Timer { get; set; }
+        private bool UpdatePosition { get; set; }
 
         public MainPage()
         {
@@ -49,11 +47,7 @@ namespace Composer
 
             SetStatus("Initialising ...");
 
-            App.Current.UnhandledException += (s, e) =>
-            {
-                AddLog(e.Message);
-                SetStatus("Failed to initialise");
-            };
+            App.Current.UnhandledException += (s, e) => AddLog(e.Message);
 
             Background = Constants.ApplicationBackgroundBrush;
             StatusBar.Background = Constants.StatusBarBackgroundBrush;
@@ -66,14 +60,16 @@ namespace Composer
             Timer = new System.Timers.Timer(100);
             Timer.Elapsed += (s, e) =>
             {
-                if (Updated)
+                while (UpdateBars.Any())
                 {
-                    Updated = false;
-                    UI.Utilities.CallUI(() =>
+                    UpdateBars.TryDequeue(out UI.Bar bar);
+                    UI.Utilities.CallUI(() => bar?.Update());
+
+                    if (UpdatePosition)
                     {
-                        UpdatePosition(CurrentPosition);
-                        UpdateBar?.Update(FullBarUpdate);
-                    });
+                        UI.Utilities.CallUI(() => Position.Text = Song.GetTime().ToTimeString());
+                        UpdatePosition = false;
+                    }
                 }
             };
             Timer.Start();
@@ -87,6 +83,7 @@ namespace Composer
             Song = new Core.Model.Song();
             Song.TrackAdded += (sender, track) => OnTrackAdded(track);
             Song.TrackRemoved += (sender, track) => OnTrackRemoved(track);
+            Song.PositionUpdated += (s, position) => UpdatePosition = true;
         }
 
         private void InitialiseKeyboardAccelerators()
@@ -246,26 +243,7 @@ namespace Composer
 
         private void AddLog(string message)
         {
-            UI.Utilities.CallUIIdle((f) => Log.Text += message + Environment.NewLine);
-        }
-
-        private void UpdatePosition(int position)
-        {
-            var bars = position / (decimal)Song.SamplesPerBar;
-            var secondsPerBar = 60 * Song.BeatsPerBar / (decimal)Song.BeatsPerMinute;
-            var seconds = (decimal)(bars * secondsPerBar);
-            var text = $"{seconds.ToTimeString()} s";
-            if (Song.BeginLoop.HasValue && Song.EndLoop.HasValue)
-            {
-                text = $" [Loop: {Song.BeginLoop.Value + 1}-{Song.EndLoop.Value + 1}] " + text;
-            }
-            Position.Text = text;
-        }
-
-        private void SetPosition(int position)
-        {
-            CurrentPosition = position;
-            Updated = true;
+            UI.Utilities.CallUI(() => Log.Text += message + Environment.NewLine);
         }
 
         private void SetStatus(string message)
@@ -290,7 +268,6 @@ namespace Composer
         {
             try
             {
-                Audio.PositionUpdated += (s, position) => SetPosition(position);
                 Audio.Stopped += (sender, song) => OnStopped();
                 Audio.Playing += (sender, song) => OnPlaying(song);
                 Audio.Recording += (sender, track) => OnRecording(track);
@@ -340,8 +317,8 @@ namespace Composer
 
         private void OnTrackAdded(Core.Model.Track track)
         {
-            track.BarAdded += (sender, bar) => UI.Utilities.CallUIIdle(f => BarAdded(bar));
-            track.BarRemoved += (sender, bar) => UI.Utilities.CallUIIdle(f => BarRemoved(bar));
+            track.BarAdded += (sender, bar) => UI.Utilities.CallUI(() => BarAdded(bar));
+            track.BarRemoved += (sender, bar) => UI.Utilities.CallUI(() => BarRemoved(bar));
             track.Name = GenerateTrackName();
             var numberOfRows = BarGrid.RowDefinitions.Count();
 
@@ -375,10 +352,10 @@ namespace Composer
                 SelectedBar?.Deselect();
                 SelectedBar = ui;
             };
-            bar.Updated += (sender, b) =>
+            bar.Updated += (s, fullUpdate) =>
             {
-                UpdateBar = ui;
-                FullBarUpdate = b;
+                ui.FullUpdate = fullUpdate;
+                UpdateBars.Enqueue(ui);
             };
             Grid.SetRow(ui, row);
             Grid.SetColumn(ui, column);
@@ -515,7 +492,7 @@ namespace Composer
             StoragePath = folder.Name;
 
             SetStatus("Saving ...");
-            UwpAudio.Save(Song, folder);
+            UwpAudio.Save(Song, folder, "temp.cmp");
             SetStatus($"Saved to {StoragePath}");
         }
 

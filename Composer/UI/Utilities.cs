@@ -10,14 +10,9 @@ namespace Composer.UI
 {
     public static class Utilities
     {
-        public async static void CallUI(DispatchedHandler f)
+        public async static void CallUI(Action f)
         {
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, f);
-        }
-
-        public async static void CallUIIdle(IdleDispatchedHandler f)
-        {
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunIdleAsync(f);
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunIdleAsync((a) => f());
         }
     }
 }

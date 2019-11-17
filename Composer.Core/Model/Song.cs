@@ -12,9 +12,11 @@ namespace Composer.Core.Model
         public List<Track> Tracks { get; set; } = new List<Track>();
         public int? BeginLoop { get; set; }
         public int? EndLoop { get; set; }
+        public int Position { get; private set; }
 
         public EventHandler<Track> TrackAdded;
         public EventHandler<Track> TrackRemoved;
+        public EventHandler<Song> PositionUpdated;
 
         public Track AddTrack(string name = "Untitled")
         {
@@ -26,6 +28,7 @@ namespace Composer.Core.Model
             };
             Tracks.Add(track);
             TrackAdded?.Invoke(this, track);
+            track.PositionUpdated += (s, e) => CalculatePosition();
             return track;
         }
 
@@ -39,6 +42,33 @@ namespace Composer.Core.Model
         public int GetLastNonEmptyBarIndex()
         {
             return Tracks.Max(track => track.GetLastNonEmptyBarIndex());
+        }
+
+        public void CalculatePosition()
+        {
+            var position = Tracks.Min(x => x.Position);
+            if (position != Position)
+            {
+                Position = position;
+                PositionUpdated?.Invoke(this, this);
+            }
+        }
+
+        public void SetPosition(int position)
+        {
+            Tracks.ForEach(x => x.Position = position);
+        }
+
+        public int GetCurrentBar()
+        {
+            return Position / SamplesPerBar;
+        }
+
+        public decimal GetTime()
+        {
+            var bars = Position / (decimal)SamplesPerBar;
+            var secondsPerBar = 60 * BeatsPerBar / (decimal)BeatsPerMinute;
+            return bars * secondsPerBar;
         }
     }
 }
