@@ -56,7 +56,7 @@ namespace Composer.Core.Model
 
         public void SetPosition(int position)
         {
-            Tracks.ForEach(x => x.Position = position);
+            Tracks.ForEach(x => x.SetPosition(position));
         }
 
         public int GetCurrentBar()

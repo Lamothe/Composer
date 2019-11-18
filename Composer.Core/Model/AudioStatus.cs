@@ -1,6 +1,6 @@
 ﻿namespace Composer.Core.Model
 {
-    public enum Status
+    public enum AudioStatus
     {
         Stopped,
         Playing,

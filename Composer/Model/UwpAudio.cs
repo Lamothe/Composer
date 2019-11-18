@@ -27,17 +27,18 @@ namespace Composer.Model
     {
         private const int ElementSize = sizeof(float);
 
-        private bool IsGraphStarted { get; set; }
         private AudioGraph Graph { get; set; }
         public DeviceInformationCollection OutputDevices { get; private set; }
         private AudioDeviceOutputNode OutputDevice { get; set; }
         private AudioDeviceInputNode InputDevice { get; set; }
+        private AudioFrameOutputNode RecordingOutputNode { get; set; }
+        private AudioStatus Status { get; set; }
+        private bool IsGraphStarted => Status == AudioStatus.Playing || Status == AudioStatus.Recording;
+        private Song Song { get; set; }
+        private Track RecordingTrack { get; set; }
 
         public event EventHandler Ready;
-        public event EventHandler Started;
-        public event EventHandler Stopped;
-        public event EventHandler<Song> Playing;
-        public event EventHandler<Track> Recording;
+        public event EventHandler<AudioStatus> AudioStatusChanged;
 
         public int SamplesPerSecond => (int)(Graph.EncodingProperties.Bitrate / Graph.EncodingProperties.BitsPerSample);
 
@@ -60,10 +61,14 @@ namespace Composer.Model
             {
                 throw new ApplicationException($"Audio graph error: {audioGraphResult.Status}");
             }
+
             Graph = audioGraphResult.Graph;
+            Graph.QuantumProcessed += (audioGraph, e) => AudioGraphQuantumProcessed();
+            Graph.QuantumStarted += (audioGraph, e) => AudioGraphQuantumStarted();
 
             InputDevice = await CreateInputDevice().ConfigureAwait(true);
             OutputDevice = await CreateOutputDevice().ConfigureAwait(true);
+            RecordingOutputNode = CreateFrameOutputNode();
 
             Ready?.Invoke(this, EventArgs.Empty);
         }
@@ -119,14 +124,19 @@ namespace Composer.Model
             }
         }
 
-        private void Start()
+        private void Start(AudioStatus status)
         {
             lock (Graph)
             {
                 Graph.Start();
-                IsGraphStarted = true;
-                Started?.Invoke(this, EventArgs.Empty);
+                SetAudioStatus(status);
             }
+        }
+
+        private void SetAudioStatus(AudioStatus status)
+        {
+            Status = status;
+            AudioStatusChanged?.Invoke(this, status);
         }
 
         public void Stop()
@@ -136,8 +146,13 @@ namespace Composer.Model
                 if (IsGraphStarted)
                 {
                     Graph.Stop();
-                    IsGraphStarted = false;
-                    Stopped?.Invoke(this, EventArgs.Empty);
+                    InputNodes.ForEach(x =>
+                    {
+                        x.RemoveOutgoingConnection(OutputDevice);
+                        x.Dispose();
+                    });
+                    InputNodes.Clear();
+                    SetAudioStatus(AudioStatus.Stopped);
                 }
             }
         }
@@ -213,33 +228,53 @@ namespace Composer.Model
                 }
             }
 
-            var frameOutputNode = CreateFrameOutputNode();
-            InputDevice.AddOutgoingConnection(frameOutputNode);
+            InputDevice.AddOutgoingConnection(RecordingOutputNode);
+            RecordingTrack = track;
 
-            void quantumStarted(AudioGraph s, object e)
+            Start(AudioStatus.Recording);
+        }
+
+        private void AudioGraphQuantumProcessed()
+        {
+            if (Status == AudioStatus.Playing)
             {
-                var samples = ReadSamplesFromFrame(frameOutputNode);
+                var lastBarIndex = Song.GetLastNonEmptyBarIndex() + 1;
+                if (Song.GetCurrentBar() >= lastBarIndex)
+                {
+                    Stop();
+                }
+            }
+        }
+
+        private void InputNodeQuantumStarted(AudioFrameInputNode inputNode, FrameInputNodeQuantumStartedEventArgs e, Track track)
+        {
+            if (Status == AudioStatus.Playing)
+            {
+                var samples = track.Read(e.RequiredSamples);
+
                 if (samples != null)
                 {
-                    if (!track.Write(samples, samples.Length))
+                    using (var frame = GenerateFrameFromSamples(samples))
+                    {
+                        inputNode.AddFrame(frame);
+                    }
+                }
+            }
+        }
+        
+        private void AudioGraphQuantumStarted()
+        {
+            if (Status == AudioStatus.Recording)
+            {
+                var samples = ReadSamplesFromFrame(RecordingOutputNode);
+                if (samples != null)
+                {
+                    if (!RecordingTrack.Write(samples, samples.Length))
                     {
                         Stop();
                     }
                 }
             }
-
-            void stopped(object sender, EventArgs e)
-            {
-                Graph.QuantumStarted -= quantumStarted;
-                frameOutputNode.Dispose();
-                Stopped -= stopped;
-            };
-
-            Stopped += stopped;
-            Graph.QuantumStarted += quantumStarted;
-
-            Start();
-            Recording?.Invoke(this, track);
         }
 
         public async void Play(Song song, int position = 0)
@@ -248,6 +283,8 @@ namespace Composer.Model
             {
                 throw new ArgumentNullException(nameof(song));
             }
+
+            Song = song;
 
             song.SetPosition(position);
 
@@ -264,39 +301,19 @@ namespace Composer.Model
                 throw new Exception("Song does not have any tracks");
             }
 
-            Graph.QuantumProcessed += (s, e) =>
-            {
-                var lastBarIndex = song.GetLastNonEmptyBarIndex() + 1;
-                if (song.GetCurrentBar() >= lastBarIndex)
-                {
-                    Stop();
-                }
-            };
-
             foreach (var track in song.Tracks)
             {
-                var input = CreateFrameInputNode();
-                input.AddOutgoingConnection(OutputDevice);
-                input.QuantumStarted += (inputNode, e) =>
-                {
-                    var samples = track.Read(track.Position, e.RequiredSamples);
-
-                    if (samples != null)
-                    {
-                        using (var frame = GenerateFrameFromSamples(samples))
-                        {
-                            inputNode.AddFrame(frame);
-                        }
-                    }
-
-                    track.Position += Graph.SamplesPerQuantum;
-                };
-                input.Start();
+                var inputNode = CreateFrameInputNode();
+                inputNode.QuantumStarted += (i, e) => InputNodeQuantumStarted(i, e, track);
+                InputNodes.Add(inputNode);
+                inputNode.AddOutgoingConnection(OutputDevice);
+                inputNode.Start();
             }
 
-            Start();
-            Playing?.Invoke(this, song);
+            Start(AudioStatus.Playing);
         }
+
+        private List<AudioFrameInputNode> InputNodes { get; set; } = new List<AudioFrameInputNode>();
 
         public static async void Save(Song song, StorageFolder folder, string fileName)
         {
@@ -335,47 +352,6 @@ namespace Composer.Model
             if (files.Any(x => x.Name.StartsWith($"bar-{trackIndex}-")))
             {
             }
-        }
-
-        public async void SaveTrackProper(Track track, StorageFile file)
-        {
-            var trackLengthInSamples = track.Song.SamplesPerBar * track.GetLastNonEmptyBarIndex();
-            var samplesRead = 0;
-
-            var fileProfile = CreateMediaEncodingProfile(file);
-            var fileOutputNodeResult = await Graph.CreateFileOutputNodeAsync(file, fileProfile);
-            if (fileOutputNodeResult.Status != AudioFileNodeCreationStatus.Success)
-            {
-                throw new Exception("Failed to create file output node");
-            }
-            var output = fileOutputNodeResult.FileOutputNode;
-
-            var input = CreateFrameInputNode();
-            input.AddOutgoingConnection(output);
-            void quantumStarted(AudioFrameInputNode sender, FrameInputNodeQuantumStartedEventArgs e)
-            {
-                var samples = track.Read(samplesRead, e.RequiredSamples);
-                samplesRead += samples.Length;
-                using (var frame = GenerateFrameFromSamples(samples))
-                {
-                    input.AddFrame(frame);
-                }
-            }
-            void quantumProcessed(AudioGraph sender, object o)
-            {
-                var position = (int)Graph.CompletedQuantumCount * Graph.SamplesPerQuantum;
-
-                if (position >= trackLengthInSamples)
-                {
-                    Graph.QuantumProcessed -= quantumProcessed;
-                    input.QuantumStarted -= quantumStarted;
-                    Stop();
-                }
-            }
-            input.QuantumStarted += quantumStarted;
-            Graph.QuantumProcessed += quantumProcessed;
-
-            input.Start();
         }
     }
 }

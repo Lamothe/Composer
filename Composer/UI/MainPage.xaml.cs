@@ -34,7 +34,7 @@ namespace Composer
         private Core.Model.Song Song { get; set; }
         private int TrackSequence { get; set; } = 0;
         private UI.Bar SelectedBar { get; set; } = null;
-        public Core.Model.Status AudioStatus { get; set; }
+        public Core.Model.AudioStatus AudioStatus { get; set; }
         public decimal SecondsPerBar { get; set; }
         private Core.Model.IAudio Audio { get; set; }
         private ConcurrentQueue<UI.Bar> UpdateBars { get; set; } = new ConcurrentQueue<UI.Bar>();
@@ -64,12 +64,12 @@ namespace Composer
                 {
                     UpdateBars.TryDequeue(out UI.Bar bar);
                     UI.Utilities.CallUI(() => bar?.Update());
+                }
 
-                    if (UpdatePosition)
-                    {
-                        UI.Utilities.CallUI(() => Position.Text = Song.GetTime().ToTimeString());
-                        UpdatePosition = false;
-                    }
+                if (UpdatePosition)
+                {
+                    UI.Utilities.CallUI(() => Position.Text = Song.GetTime().ToTimeString());
+                    UpdatePosition = false;
                 }
             };
             Timer.Start();
@@ -268,9 +268,7 @@ namespace Composer
         {
             try
             {
-                Audio.Stopped += (sender, song) => OnStopped();
-                Audio.Playing += (sender, song) => OnPlaying(song);
-                Audio.Recording += (sender, track) => OnRecording(track);
+                Audio.AudioStatusChanged += (sender, audioMode) => OnAudioStatusChanged(audioMode);
 
                 SecondsPerBar = 60 * Song.BeatsPerBar / Song.BeatsPerMinute;
                 Song.SamplesPerBar = (int)(Audio.SamplesPerSecond * SecondsPerBar) / 2;
@@ -372,19 +370,19 @@ namespace Composer
             AddLog("Bar removed");
         }
 
-        private void OnStopped()
+        private void OnAudioStatusChanged(Core.Model.AudioStatus status)
         {
-            SetAudioStatus(Core.Model.Status.Stopped);
+            SetAudioStatus(status);
         }
 
         private void OnPlaying(Core.Model.Song song)
         {
-            SetAudioStatus(Core.Model.Status.Playing);
+            SetAudioStatus(Core.Model.AudioStatus.Playing);
         }
 
         private void OnRecording(Core.Model.Track track)
         {
-            SetAudioStatus(Core.Model.Status.Recording);
+            SetAudioStatus(Core.Model.AudioStatus.Recording);
         }
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
@@ -414,7 +412,7 @@ namespace Composer
 
         private void TogglePlay()
         {
-            if (AudioStatus == Core.Model.Status.Stopped)
+            if (AudioStatus == Core.Model.AudioStatus.Stopped)
             {
                 Play();
             }
@@ -426,16 +424,15 @@ namespace Composer
 
         private void Record()
         {
-            if (AudioStatus == Core.Model.Status.Stopped)
+            if (AudioStatus == Core.Model.AudioStatus.Stopped)
             {
-                var track = Song.AddTrack();
-                Audio.Record(track);
+                Audio.Record(Song.AddTrack());
             }
         }
 
         private void Play()
         {
-            if (AudioStatus == Core.Model.Status.Stopped)
+            if (AudioStatus == Core.Model.AudioStatus.Stopped)
             {
                 if (Song.Tracks.Any())
                 {
@@ -446,13 +443,13 @@ namespace Composer
 
         private void Stop()
         {
-            if (AudioStatus != Core.Model.Status.Stopped)
+            if (AudioStatus != Core.Model.AudioStatus.Stopped)
             {
                 Audio.Stop();
             }
         }
 
-        private void SetAudioStatus(Core.Model.Status status)
+        private void SetAudioStatus(Core.Model.AudioStatus status)
         {
             if (AudioStatus != status)
             {

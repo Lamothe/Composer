@@ -185,13 +185,13 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include=".editorconfig" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Composer.Core\Composer.Core.csproj">
       <Project>{4effb2e9-6983-4ee9-ac2e-9f6d37e8ba4a}</Project>
       <Name>Composer.Core</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include=".editorconfig" />
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

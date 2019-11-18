@@ -36,6 +36,8 @@ namespace Composer
 
         private async void App_UnhandledException(object sender, Windows.UI.Xaml.UnhandledExceptionEventArgs e)
         {
+            e.Handled = true;
+
             var message = e.Message;
 
             var fnfe = e.Exception as FileNotFoundException;
@@ -46,8 +48,6 @@ namespace Composer
 
             var dialog = new MessageDialog(message);
             await dialog.ShowAsync();
-
-            e.Handled = true;
         }
 
         /// <summary>

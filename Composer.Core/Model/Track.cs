@@ -11,7 +11,7 @@ namespace Composer.Core.Model
         public Guid Id { get; set; }
         public List<Bar> Bars { get; set; } = new List<Bar>();
         public bool IsMuted { get; set; }
-        public int Position { get; set; } = 0;
+        public int Position { get; private set; } = 0;
 
         public EventHandler<Bar> BarAdded;
         public EventHandler<Bar> BarRemoved;
@@ -51,10 +51,9 @@ namespace Composer.Core.Model
             return lastBarIndex;
         }
 
-        public float[] Read(int position, int numberOfSamples)
+        public float[] Read(int numberOfSamples)
         {
-            var totalBufferLength = Bars.Count() * Song.SamplesPerBar;
-            var bar = GetBarAtPosition(position);
+            var bar = GetBarAtPosition(Position);
 
             if (bar == null)
             {
@@ -66,12 +65,12 @@ namespace Composer.Core.Model
                 return new float[numberOfSamples];
             }
 
-            var offset = position % Song.SamplesPerBar;
-
+            var offset = Position % Song.SamplesPerBar;
             var length = Math.Min(numberOfSamples, bar.Buffer.Length - offset);
 
             var buffer = new float[length];
             Array.Copy(bar.Buffer, offset, buffer, 0, length);
+            SetPosition(Position + length);
             return buffer;
         }
 
@@ -102,10 +101,18 @@ namespace Composer.Core.Model
                 bar.Write(samples, length, 0, count - remainingSpaceInBuffer);
             }
 
-            Position += count;
-            PositionUpdated?.Invoke(this, this);
+            SetPosition(Position + count);
 
             return true;
+        }
+
+        public void SetPosition(int position)
+        {
+            if (Position != position)
+            {
+                Position = position;
+                PositionUpdated?.Invoke(this, this);
+            }
         }
 
         public Bar AddBar()
