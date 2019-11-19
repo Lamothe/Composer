@@ -4,7 +4,6 @@
     {
         Stopped,
         Playing,
-        Recording,
-        Paused
+        Recording
     }
 }

@@ -124,37 +124,56 @@ namespace Composer.Model
             }
         }
 
-        private void Start(AudioStatus status)
+        private void SetAudioStatus(AudioStatus status)
         {
             lock (Graph)
             {
-                Graph.Start();
-                SetAudioStatus(status);
-            }
-        }
+                if (status != Status)
+                {
+                    if (status != AudioStatus.Stopped && Status != AudioStatus.Stopped)
+                    {
+                        throw new Exception($"Can't transition from {Status} to {status}");
+                    }
 
-        private void SetAudioStatus(AudioStatus status)
-        {
-            Status = status;
-            AudioStatusChanged?.Invoke(this, status);
+                    if (status == AudioStatus.Recording)
+                    {
+                        InputDevice.AddOutgoingConnection(RecordingOutputNode);
+                        InputDevice.Start();
+                        Graph.Start();
+                    }
+                    else if (status == AudioStatus.Playing)
+                    {
+                        Graph.Start();
+                    }
+                    else if (status == AudioStatus.Stopped)
+                    {
+                        Graph.Stop();
+
+                        if (Status == AudioStatus.Recording)
+                        {
+                            InputDevice.RemoveOutgoingConnection(RecordingOutputNode);
+                            InputDevice.Stop();
+                        }
+                        else if (Status == AudioStatus.Playing)
+                        {
+                            InputNodes.ForEach(x =>
+                            {
+                                x.RemoveOutgoingConnection(OutputDevice);
+                                x.Dispose();
+                            });
+                            InputNodes.Clear();
+                        }
+                    }
+
+                    Status = status;
+                    AudioStatusChanged?.Invoke(this, status);
+                }
+            }
         }
 
         public void Stop()
         {
-            lock (Graph)
-            {
-                if (IsGraphStarted)
-                {
-                    Graph.Stop();
-                    InputNodes.ForEach(x =>
-                    {
-                        x.RemoveOutgoingConnection(OutputDevice);
-                        x.Dispose();
-                    });
-                    InputNodes.Clear();
-                    SetAudioStatus(AudioStatus.Stopped);
-                }
-            }
+            SetAudioStatus(AudioStatus.Stopped);
         }
 
         private static unsafe float[] ReadSamplesFromFrame(AudioFrameOutputNode frameOutputNode)
@@ -218,8 +237,13 @@ namespace Composer.Model
             }
         }
 
-        public void Record(Track track)
+        public void Record(Song song)
         {
+            if (song == null)
+            {
+                throw new ArgumentNullException(nameof(song));
+            }
+
             lock (Graph)
             {
                 if (IsGraphStarted)
@@ -228,10 +252,12 @@ namespace Composer.Model
                 }
             }
 
-            InputDevice.AddOutgoingConnection(RecordingOutputNode);
+            Song = song;
+            var track = song.AddTrack();
             RecordingTrack = track;
+            Song.SetPosition(0);
 
-            Start(AudioStatus.Recording);
+            SetAudioStatus(AudioStatus.Recording);
         }
 
         private void AudioGraphQuantumProcessed()
@@ -261,7 +287,7 @@ namespace Composer.Model
                 }
             }
         }
-        
+
         private void AudioGraphQuantumStarted()
         {
             if (Status == AudioStatus.Recording)
@@ -310,7 +336,7 @@ namespace Composer.Model
                 inputNode.Start();
             }
 
-            Start(AudioStatus.Playing);
+            SetAudioStatus(AudioStatus.Playing);
         }
 
         private List<AudioFrameInputNode> InputNodes { get; set; } = new List<AudioFrameInputNode>();

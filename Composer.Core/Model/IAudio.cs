@@ -10,7 +10,7 @@ namespace Composer.Core.Model
 
         int SamplesPerSecond { get; }
 
-        void Record(Track track); 
+        void Record(Song song); 
 
         void Play(Song song, int position = 0);
 

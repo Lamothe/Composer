@@ -76,31 +76,24 @@ namespace Composer.Core.Model
 
         public bool Write(float[] samples, int count)
         {
-            var bar = GetBarAtPosition(Position);
+            var samplesRemaining = count;
 
-            if (bar == null)
+            while (samplesRemaining > 0)
             {
-                bar = AddBar();
-            }
-
-            var offset = Position % Song.SamplesPerBar;
-            var remainingSpaceInBuffer = Song.SamplesPerBar - offset;
-            var length = Math.Min(count, remainingSpaceInBuffer);
-
-            bar.Write(samples, 0, offset, length);
-
-            if (count > remainingSpaceInBuffer)
-            {
-                bar = GetBarAtPosition(Position);
+                var bar = GetBarAtPosition(Position);
 
                 if (bar == null)
                 {
-                    return false;
+                    bar = AddBar();
                 }
 
-                bar.Write(samples, length, 0, count - remainingSpaceInBuffer);
+                var offset = Position % Song.SamplesPerBar;
+                var remainingSpaceInBuffer = Song.SamplesPerBar - offset;
+                var length = Math.Min(samplesRemaining, remainingSpaceInBuffer);
+                var startIndex = count - samplesRemaining;
+                bar.Write(samples, startIndex, offset, length);
+                samplesRemaining -= length;
             }
-
             SetPosition(Position + count);
 
             return true;

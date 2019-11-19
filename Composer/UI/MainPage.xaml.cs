@@ -426,7 +426,7 @@ namespace Composer
         {
             if (AudioStatus == Core.Model.AudioStatus.Stopped)
             {
-                Audio.Record(Song.AddTrack());
+                Audio.Record(Song);
             }
         }
 
