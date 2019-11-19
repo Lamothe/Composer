@@ -74,7 +74,7 @@ namespace Composer.Core.Model
             return buffer;
         }
 
-        public bool Write(float[] samples, int count)
+        public void Write(float[] samples, int count)
         {
             var samplesRemaining = count;
 
@@ -93,10 +93,8 @@ namespace Composer.Core.Model
                 var startIndex = count - samplesRemaining;
                 bar.Write(samples, startIndex, offset, length);
                 samplesRemaining -= length;
+                SetPosition(Position + count);
             }
-            SetPosition(Position + count);
-
-            return true;
         }
 
         public void SetPosition(int position)

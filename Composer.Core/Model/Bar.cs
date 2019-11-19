@@ -30,6 +30,10 @@ namespace Composer.Core.Model
 
         public void SetBuffer(float[] buffer)
         {
+            if (buffer.Length > Buffer.Length)
+            {
+                throw new Exception("Buffer is too large");
+            }
             buffer.CopyTo(Buffer, 0);
             Length = buffer.Length;
             Updated?.Invoke(this, true);
@@ -37,6 +41,16 @@ namespace Composer.Core.Model
 
         public void Write(float[] buffer, int sourceOffset, int destinationOffset, int length)
         {
+            if (length > (Buffer.Length - destinationOffset))
+            {
+                throw new ArgumentOutOfRangeException(nameof(length), $"Length is larger than remaining space in bar buffer");
+            }
+
+            if (length > (buffer.Length - sourceOffset))
+            {
+                throw new ArgumentOutOfRangeException(nameof(length), $"Length is larger than buffer");
+            }
+
             Array.Copy(buffer, sourceOffset, Buffer, destinationOffset, length);
             Length += length;
             Updated?.Invoke(this, false);

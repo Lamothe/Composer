@@ -36,6 +36,7 @@ namespace Composer.Model
         private bool IsGraphStarted => Status == AudioStatus.Playing || Status == AudioStatus.Recording;
         private Song Song { get; set; }
         private Track RecordingTrack { get; set; }
+        private List<AudioFrameInputNode> InputNodes { get; set; } = new List<AudioFrameInputNode>();
 
         public event EventHandler Ready;
         public event EventHandler<AudioStatus> AudioStatusChanged;
@@ -260,16 +261,20 @@ namespace Composer.Model
             SetAudioStatus(AudioStatus.Recording);
         }
 
-        private void AudioGraphQuantumProcessed()
+        private void AudioGraphQuantumStarted()
         {
-            if (Status == AudioStatus.Playing)
+            if (Status == AudioStatus.Recording)
             {
-                var lastBarIndex = Song.GetLastNonEmptyBarIndex() + 1;
-                if (Song.GetCurrentBar() >= lastBarIndex)
+                var samples = ReadSamplesFromFrame(RecordingOutputNode);
+                if (samples != null)
                 {
-                    Stop();
+                    RecordingTrack.Write(samples, samples.Length);
                 }
             }
+        }
+
+        private void AudioGraphQuantumProcessed()
+        {
         }
 
         private void InputNodeQuantumStarted(AudioFrameInputNode inputNode, FrameInputNodeQuantumStartedEventArgs e, Track track)
@@ -283,21 +288,6 @@ namespace Composer.Model
                     using (var frame = GenerateFrameFromSamples(samples))
                     {
                         inputNode.AddFrame(frame);
-                    }
-                }
-            }
-        }
-
-        private void AudioGraphQuantumStarted()
-        {
-            if (Status == AudioStatus.Recording)
-            {
-                var samples = ReadSamplesFromFrame(RecordingOutputNode);
-                if (samples != null)
-                {
-                    if (!RecordingTrack.Write(samples, samples.Length))
-                    {
-                        Stop();
                     }
                 }
             }
@@ -338,8 +328,6 @@ namespace Composer.Model
 
             SetAudioStatus(AudioStatus.Playing);
         }
-
-        private List<AudioFrameInputNode> InputNodes { get; set; } = new List<AudioFrameInputNode>();
 
         public static async void Save(Song song, StorageFolder folder, string fileName)
         {
